@@ -28,10 +28,6 @@
     "concurrently": "^8.2.0",
     "rimraf": "^5.0.1"
   },
-  "workspaces": [
-    "backend",
-    "frontend"
-  ],
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=8.0.0"

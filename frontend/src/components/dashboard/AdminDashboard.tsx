@@ -42,7 +42,23 @@ export function AdminDashboard() {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
-  // Mock data for demo
+  // Calculate admin-specific statistics
+  const stats = {
+    total: complaints.length,
+    open: complaints.filter(c => ['Open', 'In Progress'].includes(c.status)).length,
+    resolved: complaints.filter(c => c.status === 'Resolved').length,
+    escalated: complaints.filter(c => c.isEscalated).length,
+    highPriority: complaints.filter(c => ['High', 'Urgent'].includes(c.priority)).length,
+    avgResolutionTime: 3.4, // Mock data
+    satisfactionRate: 4.2, // Mock data
+    pendingAssignment: complaints.filter(c => !c.assignedTo && c.status === 'Open').length,
+  };
+
+  const todayComplaints = complaints.filter(c => 
+    new Date(c.createdAt).toDateString() === new Date().toDateString()
+  ).length;
+
+  // Mock data for admin teams
   const teams: Team[] = [
     { id: '1', name: 'Technical Support', members: 8, activeTickets: 23, avgResolutionTime: 4.2, performance: 92 },
     { id: '2', name: 'Billing Department', members: 5, activeTickets: 15, avgResolutionTime: 2.8, performance: 95 },
@@ -89,22 +105,6 @@ export function AdminDashboard() {
     return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
   });
 
-  // Calculate statistics
-  const stats = {
-    total: complaints.length,
-    open: complaints.filter(c => ['Open', 'In Progress'].includes(c.status)).length,
-    resolved: complaints.filter(c => c.status === 'Resolved').length,
-    escalated: complaints.filter(c => c.isEscalated).length,
-    highPriority: complaints.filter(c => ['High', 'Urgent'].includes(c.priority)).length,
-    avgResolutionTime: 3.4, // Mock data
-    satisfactionRate: 4.2, // Mock data
-    pendingAssignment: complaints.filter(c => !c.assignedTo && c.status === 'Open').length,
-  };
-
-  const todayComplaints = complaints.filter(c => 
-    new Date(c.createdAt).toDateString() === new Date().toDateString()
-  ).length;
-
   // Utility functions
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -131,41 +131,55 @@ export function AdminDashboard() {
   // Overview Dashboard
   if (activeView === 'overview') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800">
         <Header />
         
         <div className="container mx-auto px-4 py-8">
-          {/* Welcome Section */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl p-8 text-white mb-8">
+          {/* Admin Welcome Section */}
+          <div className="bg-gradient-to-r from-orange-600 via-red-600 to-purple-700 rounded-xl p-8 text-white mb-8 shadow-2xl">
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-4xl font-bold mb-3">Admin Control Center 🛠️</h1>
-                <p className="text-purple-100 text-lg mb-6">
-                  Monitor and manage all complaints across the system. {stats.pendingAssignment > 0 && 
-                  `${stats.pendingAssignment} complaints need assignment.`}
+                <div className="flex items-center gap-3 mb-3">
+                  <Shield className="w-10 h-10 text-yellow-300" />
+                  <h1 className="text-4xl font-bold">Admin Control Center</h1>
+                </div>
+                <p className="text-orange-100 text-lg mb-6">
+                  🛡️ System-wide complaint management and administrative oversight
+                  {stats.pendingAssignment > 0 && 
+                  ` • ${stats.pendingAssignment} complaints need immediate assignment`}
                 </p>
                 
                 <div className="flex flex-wrap gap-4">
                   <button
                     onClick={() => setActiveView('complaints')}
-                    className="bg-white text-purple-700 px-6 py-3 rounded-lg flex items-center gap-2 font-semibold hover:bg-gray-50 transition-colors"
+                    className="bg-white text-orange-700 px-6 py-3 rounded-lg flex items-center gap-2 font-semibold hover:bg-gray-100 transition-colors shadow-lg"
                   >
                     <FileText className="w-5 h-5" />
-                    Manage Complaints ({stats.open} active)
+                    Manage All Complaints ({stats.open} active)
+                  </button>
+                  <button
+                    onClick={() => setActiveView('users')}
+                    className="bg-white text-purple-700 px-6 py-3 rounded-lg flex items-center gap-2 font-semibold hover:bg-gray-100 transition-colors shadow-lg"
+                  >
+                    <Shield className="w-5 h-5" />
+                    User Management
                   </button>
                   <button
                     onClick={() => setActiveView('analytics')}
                     className="bg-white bg-opacity-20 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-semibold hover:bg-opacity-30 transition-colors border border-white border-opacity-30"
                   >
                     <TrendingUp className="w-5 h-5" />
-                    View Analytics
+                    System Analytics
                   </button>
                 </div>
               </div>
               
               <div className="text-right">
-                <div className="text-3xl font-bold">{todayComplaints}</div>
-                <div className="text-purple-100">New Today</div>
+                <div className="bg-white bg-opacity-20 rounded-xl p-4 backdrop-blur-sm">
+                  <div className="text-3xl font-bold text-yellow-300">{todayComplaints}</div>
+                  <div className="text-orange-100">New Today</div>
+                  <div className="text-sm text-orange-200 mt-1">Admin View</div>
+                </div>
               </div>
             </div>
           </div>
@@ -202,9 +216,70 @@ export function AdminDashboard() {
             />
           </div>
 
-          {/* Quick Actions & Team Performance */}
+          {/* Quick Actions & Recent Complaints */}
           <div className="grid lg:grid-cols-2 gap-8 mb-8">
-            {/* Recent Critical Complaints */}
+            {/* New Complaints Feed */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-900">📋 Recent Complaints</h2>
+                <button 
+                  onClick={() => setActiveView('complaints')}
+                  className="text-blue-600 hover:text-blue-700 flex items-center gap-1 text-sm font-medium"
+                >
+                  View All <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                {complaints
+                  .filter(c => c.status === 'Open' || c.status === 'In Progress')
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                  .slice(0, 8)
+                  .map((complaint) => (
+                    <div key={complaint.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-semibold text-gray-900 line-clamp-1">{complaint.title}</h3>
+                        <div className="flex gap-2 flex-shrink-0 ml-2">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(complaint.priority)}`}>
+                            {complaint.priority}
+                          </span>
+                          <span className={`px-2 py-1 rounded text-xs font-medium border ${getStatusColor(complaint.status)}`}>
+                            {complaint.status}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">{complaint.description}</p>
+                      <div className="flex justify-between items-center text-xs text-gray-500">
+                        <div className="flex items-center gap-4">
+                          <span>ID: {complaint.id}</span>
+                          <span>Category: {complaint.category}</span>
+                          {complaint.assignedTo && (
+                            <span>Assigned: {complaint.assignedTo}</span>
+                          )}
+                        </div>
+                        <span>{new Date(complaint.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      {!complaint.assignedTo && (
+                        <div className="mt-2">
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                            ⚠️ Needs Assignment
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                
+                {complaints.filter(c => c.status === 'Open' || c.status === 'In Progress').length === 0 && (
+                  <div className="text-center py-8">
+                    <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                    <p className="text-gray-600">All complaints are resolved!</p>
+                    <p className="text-sm text-gray-500">Great work from the team!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Critical Complaints */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-900">🚨 Critical Complaints</h2>
@@ -259,48 +334,48 @@ export function AdminDashboard() {
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Team Performance */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900">👥 Team Performance</h2>
-                <button className="text-blue-600 hover:text-blue-700 flex items-center gap-1 text-sm font-medium">
-                  Manage Teams <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                {teams.map((team) => (
-                  <div key={team.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="font-semibold text-gray-900">{team.name}</h3>
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        team.performance >= 95 ? 'bg-green-100 text-green-800' :
-                        team.performance >= 90 ? 'bg-blue-100 text-blue-800' :
-                        team.performance >= 85 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {team.performance}% Performance
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <div className="text-gray-500">Members</div>
-                        <div className="font-semibold">{team.members}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500">Active Tickets</div>
-                        <div className="font-semibold">{team.activeTickets}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500">Avg Resolution</div>
-                        <div className="font-semibold">{team.avgResolutionTime}h</div>
-                      </div>
+          {/* Team Performance Section */}
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">👥 Team Performance</h2>
+              <button className="text-blue-600 hover:text-blue-700 flex items-center gap-1 text-sm font-medium">
+                Manage Teams <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {teams.map((team) => (
+                <div key={team.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-semibold text-gray-900">{team.name}</h3>
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      team.performance >= 95 ? 'bg-green-100 text-green-800' :
+                      team.performance >= 90 ? 'bg-blue-100 text-blue-800' :
+                      team.performance >= 85 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {team.performance}% Performance
                     </div>
                   </div>
-                ))}
-              </div>
+                  
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <div className="text-gray-500">Members</div>
+                      <div className="font-semibold">{team.members}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500">Active Tickets</div>
+                      <div className="font-semibold">{team.activeTickets}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-500">Avg Resolution</div>
+                      <div className="font-semibold">{team.avgResolutionTime}h</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

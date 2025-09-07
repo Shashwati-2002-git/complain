@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 interface User {
   id: string;
@@ -14,7 +14,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, role?: 'user' | 'agent' | 'admin') => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -117,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const register = async (name: string, email: string, password: string): Promise<boolean> => {
+  const register = async (name: string, email: string, password: string, role: 'user' | 'agent' | 'admin' = 'user'): Promise<boolean> => {
     try {
       const [firstName, ...lastNameParts] = name.split(' ');
       const lastName = lastNameParts.join(' ') || '';
@@ -132,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           lastName, 
           email, 
           password,
-          role: 'user' 
+          role: role 
         }),
       });
 
@@ -164,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastName: name.split(' ').slice(1).join(' ') || '',
         name,
         email,
-        role: 'user' as const,
+        role: role,
       };
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);

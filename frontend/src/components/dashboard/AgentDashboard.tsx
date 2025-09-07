@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useComplaints } from '../../contexts/ComplaintContext';
 import { Header } from '../common/Header';
-import { StatsCard } from '../common/StatsCard';
 import { ComplaintList } from '../complaints/ComplaintList';
 import { ComplaintDetails } from '../complaints/ComplaintDetails';
 import { 
@@ -14,7 +13,19 @@ import {
   Target,
   TrendingUp,
   Filter,
-  Search
+  Search,
+  Bell,
+  Calendar,
+  Star,
+  Award,
+  Zap,
+  Users,
+  BarChart3,
+  MessageCircle,
+  Timer,
+  Activity,
+  Briefcase,
+  ChevronRight
 } from 'lucide-react';
 
 export function AgentDashboard() {
@@ -48,7 +59,7 @@ export function AgentDashboard() {
   });
 
   const handleTicketUpdate = (ticketId: string, status: string, comment: string) => {
-    updateComplaintStatus(ticketId, status as any, comment);
+    updateComplaintStatus(ticketId, status as 'Open' | 'In Progress' | 'Under Review' | 'Resolved' | 'Closed', comment);
     addComplaintUpdate(ticketId, comment, user?.name || 'Agent', 'comment');
   };
 
@@ -70,33 +81,75 @@ export function AgentDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800">
       <Header />
       
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Agent Dashboard</h1>
-          <p className="text-gray-600">Manage your assigned tickets and track your performance.</p>
+      <div className="container mx-auto px-6 py-8">
+        {/* Welcome Header */}
+        <div className="mb-8 relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-blue-500/10 rounded-3xl blur-xl"></div>
+          <div className="relative bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-3xl p-8 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4 rounded-2xl shadow-lg">
+                    <Briefcase className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 bg-green-500 w-4 h-4 rounded-full animate-pulse border-2 border-slate-800"></div>
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                    Agent Dashboard
+                  </h1>
+                  <p className="text-gray-400 text-lg mt-1">
+                    Welcome back, <span className="text-orange-400 font-semibold">{user?.name || 'Agent'}</span> 
+                    • Ready to resolve complaints efficiently
+                  </p>
+                </div>
+              </div>
+              <div className="hidden lg:flex items-center gap-4">
+                <div className="bg-slate-700/50 rounded-xl px-4 py-3 border border-slate-600/50">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="w-4 h-4 text-orange-400" />
+                    <span className="text-gray-300">{new Date().toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <div className="bg-slate-700/50 rounded-xl px-4 py-3 border border-slate-600/50">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Timer className="w-4 h-4 text-blue-400" />
+                    <span className="text-gray-300">Online</span>
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex space-x-1 mb-8 bg-white p-1 rounded-lg shadow-sm">
+        <div className="flex space-x-2 mb-8 bg-slate-800/40 backdrop-blur-sm p-2 rounded-2xl shadow-lg border border-slate-700/50">
           {[
-            { id: 'overview', label: 'Overview', icon: FileText },
-            { id: 'my-tickets', label: 'My Tickets', icon: User },
-            { id: 'workload', label: 'Performance', icon: TrendingUp },
-          ].map(({ id, label, icon: Icon }) => (
+            { id: 'overview', label: 'Overview', icon: BarChart3, description: 'Dashboard summary' },
+            { id: 'my-tickets', label: 'My Tickets', icon: FileText, description: 'Assigned complaints' },
+            { id: 'workload', label: 'Performance', icon: TrendingUp, description: 'Track metrics' },
+          ].map(({ id, label, icon: Icon, description }) => (
             <button
               key={id}
-              onClick={() => setActiveTab(id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-all duration-200 ${
+              onClick={() => setActiveTab(id as 'overview' | 'my-tickets' | 'workload')}
+              className={`group relative flex-1 flex flex-col items-center gap-2 px-6 py-4 rounded-xl font-medium transition-all duration-300 ${
                 activeTab === id
-                  ? 'bg-blue-500 text-white shadow-md'
-                  : 'text-gray-600 hover:text-blue-500 hover:bg-blue-50'
+                  ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-xl transform scale-105'
+                  : 'text-gray-400 hover:text-white hover:bg-slate-700/50'
               }`}
             >
-              <Icon className="w-4 h-4" />
-              {label}
+              <Icon className={`w-6 h-6 transition-transform duration-300 ${
+                activeTab === id ? 'scale-110' : 'group-hover:scale-110'
+              }`} />
+              <span className="font-semibold">{label}</span>
+              <span className="text-xs opacity-75 hidden sm:block">{description}</span>
+              {activeTab === id && (
+                <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full"></div>
+              )}
             </button>
           ))}
         </div>
@@ -105,100 +158,255 @@ export function AgentDashboard() {
           <div className="space-y-8">
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatsCard
-                title="My Active Tickets"
-                value={activeTickets.length}
-                icon={Clock}
-                color="blue"
-                subtitle="Currently assigned to you"
-              />
-              <StatsCard
-                title="Resolved Today"
-                value={resolvedToday.length}
-                icon={CheckCircle}
-                color="green"
-                subtitle="Great progress!"
-              />
-              <StatsCard
-                title="Urgent Cases"
-                value={urgentTickets.length}
-                icon={AlertTriangle}
-                color="red"
-                subtitle="Requires immediate attention"
-              />
-              <StatsCard
-                title="Total Assigned"
-                value={myTickets.length}
-                icon={Target}
-                color="purple"
-                subtitle="All time assignments"
-              />
+              <div className="group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:border-orange-500/50 transition-all duration-500 transform group-hover:scale-105">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-3 rounded-xl">
+                      <Clock className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-white">{activeTickets.length}</div>
+                      <div className="text-blue-400 text-sm font-medium">Active Tickets</div>
+                    </div>
+                  </div>
+                  <div className="text-gray-400 text-sm">Currently assigned to you</div>
+                  <div className="mt-3 w-full bg-slate-700/50 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full" style={{width: '75%'}}></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:border-orange-500/50 transition-all duration-500 transform group-hover:scale-105">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-gradient-to-r from-green-500 to-green-600 p-3 rounded-xl">
+                      <CheckCircle className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-white">{resolvedToday.length}</div>
+                      <div className="text-green-400 text-sm font-medium">Resolved Today</div>
+                    </div>
+                  </div>
+                  <div className="text-gray-400 text-sm">Great progress today!</div>
+                  <div className="mt-3 w-full bg-slate-700/50 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full" style={{width: '92%'}}></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 to-orange-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:border-orange-500/50 transition-all duration-500 transform group-hover:scale-105">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-gradient-to-r from-red-500 to-red-600 p-3 rounded-xl">
+                      <AlertTriangle className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-white">{urgentTickets.length}</div>
+                      <div className="text-red-400 text-sm font-medium">Urgent Cases</div>
+                    </div>
+                  </div>
+                  <div className="text-gray-400 text-sm">Requires immediate attention</div>
+                  <div className="mt-3 w-full bg-slate-700/50 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-red-500 to-red-600 h-2 rounded-full" style={{width: '45%'}}></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:border-orange-500/50 transition-all duration-500 transform group-hover:scale-105">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-3 rounded-xl">
+                      <Target className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-white">{myTickets.length}</div>
+                      <div className="text-purple-400 text-sm font-medium">Total Assigned</div>
+                    </div>
+                  </div>
+                  <div className="text-gray-400 text-sm">All time assignments</div>
+                  <div className="mt-3 w-full bg-slate-700/50 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full" style={{width: '88%'}}></div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Quick Actions</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-3xl p-8 shadow-xl">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-2 rounded-xl">
+                  <Zap className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">Quick Actions</h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <button
                   onClick={() => setActiveTab('my-tickets')}
-                  className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 text-center group"
+                  className="group relative bg-slate-700/50 hover:bg-slate-700/70 border border-slate-600/50 hover:border-blue-500/50 rounded-2xl p-6 transition-all duration-300 transform hover:scale-105"
                 >
-                  <Clock className="w-8 h-8 text-gray-400 group-hover:text-blue-500 mx-auto mb-2" />
-                  <div className="font-medium text-gray-700 group-hover:text-blue-600">View Active Tickets</div>
-                  <div className="text-sm text-gray-500">{activeTickets.length} pending</div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="relative text-center">
+                    <Clock className="w-12 h-12 text-blue-400 group-hover:text-blue-300 mx-auto mb-4 transition-colors duration-300 group-hover:scale-110 transform" />
+                    <div className="font-bold text-white text-lg group-hover:text-blue-300 transition-colors duration-300">View Active Tickets</div>
+                    <div className="text-gray-400 text-sm mt-2">{activeTickets.length} pending tickets</div>
+                  </div>
                 </button>
                 
-                <button className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 text-center group">
-                  <CheckCircle className="w-8 h-8 text-gray-400 group-hover:text-green-500 mx-auto mb-2" />
-                  <div className="font-medium text-gray-700 group-hover:text-green-600">Mark as Resolved</div>
-                  <div className="text-sm text-gray-500">Quick resolution</div>
+                <button className="group relative bg-slate-700/50 hover:bg-slate-700/70 border border-slate-600/50 hover:border-green-500/50 rounded-2xl p-6 transition-all duration-300 transform hover:scale-105">
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-emerald-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="relative text-center">
+                    <CheckCircle className="w-12 h-12 text-green-400 group-hover:text-green-300 mx-auto mb-4 transition-colors duration-300 group-hover:scale-110 transform" />
+                    <div className="font-bold text-white text-lg group-hover:text-green-300 transition-colors duration-300">Mark as Resolved</div>
+                    <div className="text-gray-400 text-sm mt-2">Quick resolution</div>
+                  </div>
                 </button>
                 
                 <button
                   onClick={() => setActiveTab('workload')}
-                  className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all duration-200 text-center group"
+                  className="group relative bg-slate-700/50 hover:bg-slate-700/70 border border-slate-600/50 hover:border-purple-500/50 rounded-2xl p-6 transition-all duration-300 transform hover:scale-105"
                 >
-                  <TrendingUp className="w-8 h-8 text-gray-400 group-hover:text-purple-500 mx-auto mb-2" />
-                  <div className="font-medium text-gray-700 group-hover:text-purple-600">View Performance</div>
-                  <div className="text-sm text-gray-500">Track metrics</div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-pink-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="relative text-center">
+                    <Award className="w-12 h-12 text-purple-400 group-hover:text-purple-300 mx-auto mb-4 transition-colors duration-300 group-hover:scale-110 transform" />
+                    <div className="font-bold text-white text-lg group-hover:text-purple-300 transition-colors duration-300">View Performance</div>
+                    <div className="text-gray-400 text-sm mt-2">Track your metrics</div>
+                  </div>
                 </button>
               </div>
             </div>
 
             {/* Recent Tickets */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Assignments</h2>
+            <div className="bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-3xl p-8 shadow-xl">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-2 rounded-xl">
+                    <Activity className="w-5 h-5 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">My Recent Assignments</h2>
+                </div>
+                {myTickets.length > 0 && (
+                  <button
+                    onClick={() => setActiveTab('my-tickets')}
+                    className="text-orange-400 hover:text-orange-300 text-sm font-medium flex items-center gap-1 transition-colors duration-200"
+                  >
+                    View All <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              
               {myTickets.length === 0 ? (
-                <div className="text-center py-8">
-                  <User className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500 mb-4">No tickets assigned yet</p>
-                  <p className="text-sm text-gray-400">New assignments will appear here</p>
+                <div className="text-center py-12">
+                  <div className="bg-gradient-to-r from-orange-500/10 to-purple-500/10 p-6 rounded-2xl w-fit mx-auto mb-4">
+                    <User className="w-16 h-16 text-gray-400 mx-auto" />
+                  </div>
+                  <p className="text-gray-300 text-lg mb-2">No tickets assigned yet</p>
+                  <p className="text-gray-500">New assignments will appear here once you're assigned tickets</p>
                 </div>
               ) : (
-                <ComplaintList 
-                  complaints={myTickets.slice(0, 5)} 
-                  showActions={true} 
-                  isAgent={true}
-                  onSelectComplaint={setSelectedComplaint}
-                />
+                <div className="space-y-4">
+                  {/* Show new/recent assignments first */}
+                  {myTickets
+                    .filter(t => t.status === 'Open' || t.status === 'In Progress')
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .slice(0, 6)
+                    .map((ticket) => {
+                      const isNew = new Date().getTime() - new Date(ticket.createdAt).getTime() < 24 * 60 * 60 * 1000; // Less than 24 hours old
+                      const isUrgent = ticket.priority === 'Urgent' || ticket.priority === 'High';
+                      
+                      return (
+                        <div key={ticket.id} className={`relative border rounded-xl p-6 transition-all duration-300 hover:transform hover:scale-102 ${
+                          isUrgent ? 'border-red-500/50 bg-red-500/10' : 
+                          isNew ? 'border-orange-500/50 bg-orange-500/10' : 
+                          'border-slate-600/50 bg-slate-700/30'
+                        }`}>
+                          {isNew && (
+                            <div className="absolute -top-2 -right-2">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-500 text-white animate-pulse">
+                                🆕 New
+                              </span>
+                            </div>
+                          )}
+                          
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex-1">
+                              <h3 className="text-white font-semibold text-lg mb-2 line-clamp-1">{ticket.title}</h3>
+                              <p className="text-gray-300 text-sm line-clamp-2 mb-3">{ticket.description}</p>
+                              
+                              <div className="flex items-center gap-4 text-xs">
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  ticket.priority === 'Urgent' ? 'bg-red-500/20 text-red-400' :
+                                  ticket.priority === 'High' ? 'bg-orange-500/20 text-orange-400' :
+                                  ticket.priority === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                                  'bg-green-500/20 text-green-400'
+                                }`}>
+                                  {ticket.priority} Priority
+                                </span>
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  ticket.status === 'Open' ? 'bg-blue-500/20 text-blue-400' :
+                                  ticket.status === 'In Progress' ? 'bg-yellow-500/20 text-yellow-400' :
+                                  'bg-gray-500/20 text-gray-400'
+                                }`}>
+                                  {ticket.status}
+                                </span>
+                                <span className="text-gray-500">
+                                  Category: {ticket.category}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="flex flex-col items-end gap-2 ml-4">
+                              <span className="text-xs text-gray-500">
+                                {new Date(ticket.createdAt).toLocaleDateString()}
+                              </span>
+                              <button
+                                onClick={() => setSelectedComplaint(ticket.id)}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                  isUrgent ? 'bg-red-500 hover:bg-red-600 text-white' :
+                                  'bg-orange-500 hover:bg-orange-600 text-white'
+                                } transform hover:scale-105`}
+                              >
+                                {ticket.status === 'Open' ? 'Start Working' : 'Continue'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  
+                  {myTickets.filter(t => t.status === 'Open' || t.status === 'In Progress').length === 0 && (
+                    <div className="text-center py-8">
+                      <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                      <p className="text-gray-300">All your tickets are resolved!</p>
+                      <p className="text-gray-500 text-sm">Great work! New assignments will appear here.</p>
+                    </div>
+                  )}
+                </div>
               )}
-            </div>
+            </div> 
           </div>
         )}
 
         {activeTab === 'my-tickets' && (
           <div className="space-y-6">
             {/* Filters */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl shadow-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Filter className="w-5 h-5 text-orange-400" />
+                <h3 className="text-lg font-semibold text-white">Filter & Search Tickets</h3>
+              </div>
               <div className="flex flex-col lg:flex-row gap-4">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Search my tickets..."
+                    placeholder="Search tickets by ID, title, or description..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-12 pr-4 py-4 bg-slate-700/50 border border-slate-600/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-white placeholder-gray-400 transition-all duration-300"
                   />
                 </div>
                 
@@ -206,7 +414,7 @@ export function AgentDashboard() {
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="px-6 py-4 bg-slate-700/50 border border-slate-600/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-white min-w-[150px] transition-all duration-300"
                   >
                     <option value="all">All Status</option>
                     <option value="open">Open</option>
@@ -218,7 +426,7 @@ export function AgentDashboard() {
                   <select
                     value={filterPriority}
                     onChange={(e) => setFilterPriority(e.target.value)}
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="px-6 py-4 bg-slate-700/50 border border-slate-600/50 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-white min-w-[150px] transition-all duration-300"
                   >
                     <option value="all">All Priority</option>
                     <option value="urgent">Urgent</option>
@@ -231,19 +439,34 @@ export function AgentDashboard() {
             </div>
 
             {/* My Tickets List */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl shadow-xl p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-800">My Assigned Tickets</h2>
-                <div className="text-sm text-gray-500">
-                  {filteredTickets.length} of {myTickets.length} tickets
+                <div className="flex items-center gap-3">
+                  <FileText className="w-6 h-6 text-orange-400" />
+                  <h2 className="text-2xl font-bold text-white">My Assigned Tickets</h2>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="bg-slate-700/50 px-4 py-2 rounded-xl border border-slate-600/50">
+                    <span className="text-gray-300 text-sm">
+                      <span className="text-orange-400 font-semibold">{filteredTickets.length}</span> of <span className="text-white font-semibold">{myTickets.length}</span> tickets
+                    </span>
+                  </div>
+                  {urgentTickets.length > 0 && (
+                    <div className="bg-red-500/20 text-red-400 px-4 py-2 rounded-xl border border-red-500/30 flex items-center gap-2">
+                      <Bell className="w-4 h-4 animate-pulse" />
+                      <span className="text-sm font-medium">{urgentTickets.length} urgent</span>
+                    </div>
+                  )}
                 </div>
               </div>
-              <ComplaintList 
-                complaints={filteredTickets} 
-                showActions={true} 
-                isAgent={true}
-                onSelectComplaint={setSelectedComplaint}
-              />
+              <div className="bg-slate-700/30 rounded-xl p-6">
+                <ComplaintList 
+                  complaints={filteredTickets} 
+                  showActions={true} 
+                  isAgent={true}
+                  onSelectComplaint={setSelectedComplaint}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -252,62 +475,119 @@ export function AgentDashboard() {
           <div className="space-y-8">
             {/* Performance Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatsCard
-                title="Resolution Rate"
-                value="94%"
-                icon={Target}
-                color="green"
-                subtitle="Above team average"
-              />
-              <StatsCard
-                title="Avg Response Time"
-                value="2.1h"
-                icon={Clock}
-                color="blue"
-                subtitle="Within SLA targets"
-              />
-              <StatsCard
-                title="Customer Rating"
-                value="4.8/5"
-                icon={User}
-                color="purple"
-                subtitle="Based on resolved tickets"
-              />
-              <StatsCard
-                title="Tickets This Week"
-                value={myTickets.filter(t => {
-                  const weekAgo = new Date();
-                  weekAgo.setDate(weekAgo.getDate() - 7);
-                  return t.createdAt >= weekAgo;
-                }).length}
-                icon={TrendingUp}
-                color="orange"
-                subtitle="Weekly performance"
-              />
+              <div className="group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:border-green-500/50 transition-all duration-500 transform group-hover:scale-105">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-gradient-to-r from-green-500 to-green-600 p-3 rounded-xl">
+                      <Target className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-white">94%</div>
+                      <div className="text-green-400 text-sm font-medium">Resolution Rate</div>
+                    </div>
+                  </div>
+                  <div className="text-gray-400 text-sm">Above team average</div>
+                  <div className="mt-3 w-full bg-slate-700/50 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full" style={{width: '94%'}}></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:border-blue-500/50 transition-all duration-500 transform group-hover:scale-105">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-3 rounded-xl">
+                      <Clock className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-white">2.1h</div>
+                      <div className="text-blue-400 text-sm font-medium">Avg Response</div>
+                    </div>
+                  </div>
+                  <div className="text-gray-400 text-sm">Within SLA targets</div>
+                  <div className="mt-3 w-full bg-slate-700/50 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full" style={{width: '85%'}}></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:border-yellow-500/50 transition-all duration-500 transform group-hover:scale-105">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-gradient-to-r from-yellow-500 to-orange-500 p-3 rounded-xl">
+                      <Star className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-white">4.8/5</div>
+                      <div className="text-yellow-400 text-sm font-medium">Rating</div>
+                    </div>
+                  </div>
+                  <div className="text-gray-400 text-sm">Customer satisfaction</div>
+                  <div className="mt-3 w-full bg-slate-700/50 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-yellow-500 to-orange-500 h-2 rounded-full" style={{width: '96%'}}></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:border-purple-500/50 transition-all duration-500 transform group-hover:scale-105">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-3 rounded-xl">
+                      <TrendingUp className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-white">{myTickets.filter(t => {
+                        const weekAgo = new Date();
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return t.createdAt >= weekAgo;
+                      }).length}</div>
+                      <div className="text-purple-400 text-sm font-medium">This Week</div>
+                    </div>
+                  </div>
+                  <div className="text-gray-400 text-sm">Weekly performance</div>
+                  <div className="mt-3 w-full bg-slate-700/50 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full" style={{width: '78%'}}></div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Performance Chart */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-6">Weekly Performance</h2>
-              <div className="space-y-4">
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
+            <div className="bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl shadow-xl p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-2 rounded-xl">
+                  <BarChart3 className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">Weekly Performance Breakdown</h2>
+              </div>
+              <div className="space-y-6">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
                   const resolved = Math.floor(Math.random() * 8) + 1; // Mock data
                   const maxDaily = 10;
                   const percentage = (resolved / maxDaily) * 100;
                   
                   return (
-                    <div key={day} className="flex items-center gap-4">
-                      <div className="w-12 text-sm font-medium text-gray-600">{day}</div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-gray-500">Tickets Resolved</span>
-                          <span className="text-sm font-medium text-gray-700">{resolved}</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3">
-                          <div 
-                            className="h-3 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                          ></div>
+                    <div key={day} className="group">
+                      <div className="flex items-center gap-6">
+                        <div className="w-16 text-lg font-bold text-white">{day}</div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-gray-300 font-medium">Tickets Resolved</span>
+                            <span className="text-white font-bold text-lg">{resolved}</span>
+                          </div>
+                          <div className="relative">
+                            <div className="w-full bg-slate-700/50 rounded-full h-4">
+                              <div 
+                                className="h-4 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-700 group-hover:from-orange-400 group-hover:to-orange-500"
+                                style={{ width: `${percentage}%` }}
+                              ></div>
+                            </div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-orange-600/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -317,30 +597,46 @@ export function AgentDashboard() {
             </div>
 
             {/* Recent Activity */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Activity</h2>
+            <div className="bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl shadow-xl p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-2 rounded-xl">
+                  <Activity className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">Recent Activity Timeline</h2>
+              </div>
               <div className="space-y-4">
                 {myTickets.slice(0, 5).map((ticket) => (
-                  <div key={ticket.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div className={`p-2 rounded-full ${
-                      ticket.priority === 'Urgent' ? 'bg-red-100 text-red-600' :
-                      ticket.priority === 'High' ? 'bg-orange-100 text-orange-600' :
-                      ticket.priority === 'Medium' ? 'bg-yellow-100 text-yellow-600' :
-                      'bg-green-100 text-green-600'
-                    }`}>
-                      <AlertTriangle className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-800">#{ticket.id}</div>
-                      <div className="text-sm text-gray-600">{ticket.title}</div>
-                      <div className="text-xs text-gray-500">{ticket.updatedAt.toLocaleString()}</div>
-                    </div>
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      ticket.status === 'Resolved' ? 'bg-green-100 text-green-800' :
-                      ticket.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {ticket.status}
+                  <div key={ticket.id} className="group relative bg-slate-700/30 hover:bg-slate-700/50 rounded-xl p-6 transition-all duration-300 border border-slate-600/30 hover:border-orange-500/50">
+                    <div className="flex items-center gap-6">
+                      <div className={`relative p-3 rounded-xl ${
+                        ticket.priority === 'Urgent' ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                        ticket.priority === 'High' ? 'bg-gradient-to-r from-orange-500 to-orange-600' :
+                        ticket.priority === 'Medium' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
+                        'bg-gradient-to-r from-green-500 to-green-600'
+                      } group-hover:scale-110 transition-transform duration-300`}>
+                        <MessageCircle className="w-5 h-5 text-white" />
+                        {ticket.priority === 'Urgent' && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-400 rounded-full animate-ping"></div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="font-bold text-white text-lg">#{ticket.id}</div>
+                          <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            ticket.status === 'Resolved' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                            ticket.status === 'In Progress' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                            'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                          }`}>
+                            {ticket.status}
+                          </div>
+                        </div>
+                        <div className="text-gray-300 font-medium mb-1">{ticket.title}</div>
+                        <div className="text-gray-400 text-sm">{ticket.updatedAt.toLocaleString()}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-300 text-sm">User #{ticket.userId.slice(-8)}</span>
+                      </div>
                     </div>
                   </div>
                 ))}

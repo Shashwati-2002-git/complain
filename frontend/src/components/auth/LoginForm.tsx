@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Shield, Mail, Lock, User, AlertCircle } from 'lucide-react';
+import { Shield, Mail, Lock, User, AlertCircle, UserCheck } from 'lucide-react';
 
 interface LoginFormProps {
   onBack?: () => void;
@@ -12,6 +12,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
     name: '',
     email: '',
     password: '',
+    role: 'user' as 'user' | 'agent' | 'admin',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,7 +26,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
     try {
       const success = isLogin 
         ? await login(formData.email, formData.password)
-        : await register(formData.name, formData.email, formData.password);
+        : await register(formData.name, formData.email, formData.password, formData.role);
 
       if (!success && isLogin) {
         setError('Invalid email or password');
@@ -71,17 +72,33 @@ export function LoginForm({ onBack }: LoginFormProps) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Full Name"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
-                required={!isLogin}
-              />
-            </div>
+            <>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Full Name"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
+                  required={!isLogin}
+                />
+              </div>
+              
+              <div className="relative">
+                <UserCheck className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as 'user' | 'agent' | 'admin' }))}
+                  className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
+                  required={!isLogin}
+                >
+                  <option value="user">User</option>
+                  <option value="agent">Agent</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </>
           )}
 
           <div className="relative">
@@ -126,15 +143,18 @@ export function LoginForm({ onBack }: LoginFormProps) {
           </button>
         </div>
 
-        <div className="mt-6 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-          <p className="text-xs text-orange-400 mb-2 font-semibold">Demo Accounts:</p>
-          <div className="text-xs text-gray-400 space-y-1">
-            <div>User: user@example.com / password</div>
-            <div>Admin: admin@example.com / admin</div>
-            <div>Agent: agent@example.com / agent</div>
-          </div>
+        {/* <div className="mt-6 p-4 bg-gray-700/50 rounded-lg border border-gray-600"> */}
+          {/* <p className="text-xs text-orange-400 mb-2 font-semibold">Demo Accounts:</p> */}
+          {/* <div className="text-xs text-gray-400 space-y-1">
+            <div><span className="text-blue-400">User:</span> user@example.com / password</div>
+            <div><span className="text-green-400">Agent:</span> agent@example.com / agent</div>
+            <div><span className="text-orange-400">Admin:</span> admin@example.com / admin</div> */}
+          {/* </div> */}
+          <p className="text-xs text-gray-500 mt-2">
+            {/* {isLogin ? 'Use these accounts to test different roles' : 'Or register with your preferred role above'} */}
+          </p>
         </div>
       </div>
-    </div>
+    // </div>
   );
 }
