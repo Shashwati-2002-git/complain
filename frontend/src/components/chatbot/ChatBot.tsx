@@ -25,6 +25,7 @@ export function ChatBot() {
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const { createComplaint, getUserComplaints } = useComplaints();
   const { user } = useAuth();
   const { addNotification } = useNotifications();
@@ -53,58 +54,72 @@ export function ChatBot() {
 
     try {
       // Check if user wants to file a complaint
-      if (userMessage.toLowerCase().includes('complaint') || 
-          userMessage.toLowerCase().includes('issue') || 
-          userMessage.toLowerCase().includes('problem')) {
-        
-        // Extract complaint details if provided
+      if (
+        userMessage.toLowerCase().includes('complaint') ||
+        userMessage.toLowerCase().includes('issue') ||
+        userMessage.toLowerCase().includes('problem')
+      ) {
         if (userMessage.length > 50 && user) {
           // Create complaint from chat message
           const title = userMessage.substring(0, 60) + '...';
           const complaint = await createComplaint(title, userMessage, user.id);
-          
+
           addMessage(
             `I've created a complaint for you (Ticket #${complaint.id}). It has been classified as ${complaint.category} with ${complaint.priority} priority. You'll receive updates on its progress.`,
             'bot'
           );
-          
-          addNotification('success', 'Complaint Filed via Chat', 
-            `Ticket #${complaint.id} has been created and assigned ${complaint.priority} priority.`);
+
+          addNotification(
+            'success',
+            'Complaint Filed via Chat',
+            `Ticket #${complaint.id} has been created and assigned ${complaint.priority} priority.`
+          );
         } else {
           addMessage(
             "I'd be happy to help you file a complaint. Could you please provide more details about the issue you're experiencing?",
             'bot'
           );
         }
-      } else if (userMessage.toLowerCase().includes('status')) {
-        // Check complaint status
+      } 
+      // Check complaint status
+      else if (userMessage.toLowerCase().includes('status')) {
         if (user) {
-          const userComplaints = getUserComplaints(user.id);
-          if (userComplaints.length === 0) {
-            addMessage("You don't have any complaints filed yet. Would you like to file one?", 'bot');
+          const userComplaints = await getUserComplaints(user.id); // ✅ FIXED (added await)
+          if (!userComplaints || userComplaints.length === 0) {
+            addMessage(
+              "You don't have any complaints filed yet. Would you like to file one?",
+              'bot'
+            );
           } else {
             const recentComplaint = userComplaints[userComplaints.length - 1];
             addMessage(
               `Your most recent complaint (Ticket #${recentComplaint.id}) is currently "${recentComplaint.status}". ${
-                recentComplaint.assignedTo ? `It's assigned to ${recentComplaint.assignedTo}.` : 'It will be assigned to an agent soon.'
+                recentComplaint.assignedTo
+                  ? `It's assigned to ${recentComplaint.assignedTo}.`
+                  : 'It will be assigned to an agent soon.'
               }`,
               'bot'
             );
           }
         }
-      } else {
-        // General AI response
+      } 
+      // General AI response
+      else {
         const response = await aiService.generateResponse('general', userMessage);
         addMessage(response, 'bot');
       }
     } catch (error) {
-      addMessage("I'm sorry, I encountered an error. Please try again or contact support directly.", 'bot');
+      console.error(error);
+      addMessage(
+        "I'm sorry, I encountered an error. Please try again or contact support directly.",
+        'bot'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -148,28 +163,41 @@ export function ChatBot() {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex items-start gap-3 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}
+            className={`flex items-start gap-3 ${
+              message.sender === 'user' ? 'flex-row-reverse' : ''
+            }`}
           >
-            <div className={`p-2 rounded-full ${
-              message.sender === 'user' 
-                ? 'bg-blue-500 text-white' 
-                : 'bg-white border border-gray-200 text-blue-500'
-            }`}>
-              {message.sender === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+            <div
+              className={`p-2 rounded-full ${
+                message.sender === 'user'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white border border-gray-200 text-blue-500'
+              }`}
+            >
+              {message.sender === 'user' ? (
+                <User className="w-4 h-4" />
+              ) : (
+                <Bot className="w-4 h-4" />
+              )}
             </div>
-            <div className={`max-w-[80%] p-3 rounded-xl ${
-              message.sender === 'user'
-                ? 'bg-blue-500 text-white ml-auto'
-                : 'bg-white border border-gray-200 text-gray-800'
-            }`}>
+            <div
+              className={`max-w-[80%] p-3 rounded-xl ${
+                message.sender === 'user'
+                  ? 'bg-blue-500 text-white ml-auto'
+                  : 'bg-white border border-gray-200 text-gray-800'
+              }`}
+            >
               <p className="text-sm leading-relaxed">{message.text}</p>
               <p className="text-xs opacity-70 mt-1">
-                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {message.timestamp.toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
               </p>
             </div>
           </div>
         ))}
-        
+
         {loading && (
           <div className="flex items-start gap-3">
             <div className="bg-white border border-gray-200 text-blue-500 p-2 rounded-full">
@@ -177,9 +205,18 @@ export function ChatBot() {
             </div>
             <div className="bg-white border border-gray-200 p-3 rounded-xl">
               <div className="flex gap-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                <div
+                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                  style={{ animationDelay: '0ms' }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                  style={{ animationDelay: '150ms' }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                  style={{ animationDelay: '300ms' }}
+                ></div>
               </div>
             </div>
           </div>
@@ -194,7 +231,7 @@ export function ChatBot() {
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown} // ✅ FIXED (was onKeyPress)
             placeholder="Type your message..."
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
             disabled={loading}
