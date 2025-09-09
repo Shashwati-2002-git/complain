@@ -135,23 +135,54 @@ export const googleLogin = async (req, res) => {
       return res.status(400).json({ message: "Google token is required" });
     }
 
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      console.error("GOOGLE_CLIENT_ID environment variable is not set");
+      return res.status(500).json({ message: "Server configuration error" });
+    }
+
     // Verify token
     const ticket = await client.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
 
-    const { name, email } = ticket.getPayload();
+    const payload = ticket.getPayload();
+    if (!payload) {
+      return res.status(400).json({ message: "Invalid Google token" });
+    }
 
-    let user = await User.findOne({ email });
+    const { name, email, email_verified } = payload;
+
+    if (!email_verified) {
+      return res.status(400).json({ message: "Email not verified with Google" });
+    }
+
+    if (!email || !name) {
+      return res.status(400).json({ message: "Required user information not available from Google" });
+    }
+
+    let user = await User.findOne({ email: email.toLowerCase().trim() });
 
     if (!user) {
       // Create user if not exists
       user = await User.create({
-        name,
-        email,
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
         password: Math.random().toString(36).slice(-8), // dummy password
         role: "user",
+        isGoogleUser: true, // Mark as Google user
+      });
+      
+      console.log("New Google user created:", {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      });
+    } else {
+      console.log("Existing Google user logged in:", {
+        id: user._id,
+        name: user.name,
+        email: user.email,
       });
     }
 
@@ -167,6 +198,23 @@ export const googleLogin = async (req, res) => {
     });
   } catch (error) {
     console.error("Google login error:", error);
-    res.status(500).json({ message: "Server error during Google login" });
+    
+    // More specific error messages
+    if (error.message && error.message.includes('Token used too early')) {
+      return res.status(400).json({ message: "Invalid token timing. Please try again." });
+    }
+    
+    if (error.message && error.message.includes('Invalid token signature')) {
+      return res.status(400).json({ message: "Invalid Google token. Please try again." });
+    }
+    
+    if (error.message && error.message.includes('Token expired')) {
+      return res.status(400).json({ message: "Google token expired. Please try again." });
+    }
+
+    res.status(500).json({ 
+      message: "Server error during Google login",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
