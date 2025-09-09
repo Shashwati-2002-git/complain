@@ -1,11 +1,11 @@
 import express from 'express';
-import { authenticate } from '../middleware/auth';
-import { asyncHandler } from '../middleware/errorHandler';
+import { authenticate } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/errorHandler.js';
 
 const router = express.Router();
 
 // Get user notifications
-router.get('/', authenticate, asyncHandler(async (req: any, res: any) => {
+router.get('/', authenticate, asyncHandler(async (req, res) => {
   // In a real application, you would fetch notifications from a database
   // For now, we'll return mock notifications
   const mockNotifications = [
@@ -53,7 +53,7 @@ router.get('/', authenticate, asyncHandler(async (req: any, res: any) => {
 }));
 
 // Mark notification as read
-router.patch('/:id/read', authenticate, asyncHandler(async (req: any, res: any) => {
+router.patch('/:id/read', authenticate, asyncHandler(async (req, res) => {
   const { id } = req.params;
   
   // In a real application, you would update the notification in the database
@@ -61,13 +61,13 @@ router.patch('/:id/read', authenticate, asyncHandler(async (req: any, res: any) 
 }));
 
 // Mark all notifications as read
-router.patch('/read-all', authenticate, asyncHandler(async (req: any, res: any) => {
+router.patch('/read-all', authenticate, asyncHandler(async (req, res) => {
   // In a real application, you would update all user notifications in the database
   res.json({ message: 'All notifications marked as read' });
 }));
 
 // Delete notification
-router.delete('/:id', authenticate, asyncHandler(async (req: any, res: any) => {
+router.delete('/:id', authenticate, asyncHandler(async (req, res) => {
   const { id } = req.params;
   
   // In a real application, you would delete the notification from the database
@@ -75,7 +75,7 @@ router.delete('/:id', authenticate, asyncHandler(async (req: any, res: any) => {
 }));
 
 // Get notification preferences
-router.get('/preferences', authenticate, asyncHandler(async (req: any, res: any) => {
+router.get('/preferences', authenticate, asyncHandler(async (req, res) => {
   // Return user notification preferences
   const preferences = {
     email: {
@@ -105,7 +105,7 @@ router.get('/preferences', authenticate, asyncHandler(async (req: any, res: any)
 }));
 
 // Update notification preferences
-router.patch('/preferences', authenticate, asyncHandler(async (req: any, res: any) => {
+router.patch('/preferences', authenticate, asyncHandler(async (req, res) => {
   const { email, push, sms } = req.body;
   
   // In a real application, you would save these preferences to the user's profile

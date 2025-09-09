@@ -1,31 +1,25 @@
-interface AIAnalysis {
-  category: 'Billing' | 'Technical' | 'Service' | 'Product' | 'General';
-  sentiment: 'Positive' | 'Neutral' | 'Negative';
-  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
-  confidence: number;
-  keywords: string[];
-}
+class AIService {
+  constructor() {
+    this.keywords = {
+      billing: ['bill', 'charge', 'payment', 'refund', 'invoice', 'money', 'cost', 'price', 'fee', 'subscription', 'credit', 'debit'],
+      technical: ['error', 'bug', 'crash', 'login', 'password', 'app', 'website', 'connection', 'loading', 'server', 'database', 'api'],
+      service: ['support', 'staff', 'representative', 'customer service', 'help', 'agent', 'response time', 'waiting', 'queue'],
+      product: ['defective', 'broken', 'quality', 'delivery', 'shipping', 'wrong item', 'damaged', 'missing', 'packaging'],
+    };
 
-export class AIService {
-  private keywords = {
-    billing: ['bill', 'charge', 'payment', 'refund', 'invoice', 'money', 'cost', 'price', 'fee', 'subscription', 'credit', 'debit'],
-    technical: ['error', 'bug', 'crash', 'login', 'password', 'app', 'website', 'connection', 'loading', 'server', 'database', 'api'],
-    service: ['support', 'staff', 'representative', 'customer service', 'help', 'agent', 'response time', 'waiting', 'queue'],
-    product: ['defective', 'broken', 'quality', 'delivery', 'shipping', 'wrong item', 'damaged', 'missing', 'packaging'],
-  };
+    this.urgentKeywords = ['urgent', 'emergency', 'critical', 'down', 'outage', 'immediately', 'asap', 'loss', 'security breach'];
+    this.negativeKeywords = ['angry', 'frustrated', 'terrible', 'worst', 'hate', 'disappointed', 'unacceptable', 'furious', 'disgusted'];
+    this.positiveKeywords = ['thank', 'great', 'excellent', 'satisfied', 'good', 'appreciate', 'helpful', 'amazing', 'wonderful'];
+  }
 
-  private urgentKeywords = ['urgent', 'emergency', 'critical', 'down', 'outage', 'immediately', 'asap', 'loss', 'security breach'];
-  private negativeKeywords = ['angry', 'frustrated', 'terrible', 'worst', 'hate', 'disappointed', 'unacceptable', 'furious', 'disgusted'];
-  private positiveKeywords = ['thank', 'great', 'excellent', 'satisfied', 'good', 'appreciate', 'helpful', 'amazing', 'wonderful'];
-
-  async classifyComplaint(text: string): Promise<AIAnalysis> {
+  async classifyComplaint(text) {
     const lowercaseText = text.toLowerCase();
     const words = lowercaseText.split(/\s+/);
     
     // Category classification with scoring
-    let category: AIAnalysis['category'] = 'General';
+    let category = 'General';
     let maxScore = 0;
-    const foundKeywords: string[] = [];
+    const foundKeywords = [];
 
     for (const [cat, keywords] of Object.entries(this.keywords)) {
       const matchedKeywords = keywords.filter(keyword => lowercaseText.includes(keyword));
@@ -33,13 +27,13 @@ export class AIService {
       
       if (score > maxScore) {
         maxScore = score;
-        category = cat.charAt(0).toUpperCase() + cat.slice(1) as AIAnalysis['category'];
+        category = cat.charAt(0).toUpperCase() + cat.slice(1);
         foundKeywords.push(...matchedKeywords);
       }
     }
 
     // Sentiment analysis
-    let sentiment: AIAnalysis['sentiment'] = 'Neutral';
+    let sentiment = 'Neutral';
     const negativeScore = this.negativeKeywords.filter(keyword => lowercaseText.includes(keyword)).length;
     const positiveScore = this.positiveKeywords.filter(keyword => lowercaseText.includes(keyword)).length;
 
@@ -50,7 +44,7 @@ export class AIService {
     }
 
     // Priority assignment with enhanced logic
-    let priority: AIAnalysis['priority'] = 'Low';
+    let priority = 'Low';
     const urgentScore = this.urgentKeywords.filter(keyword => lowercaseText.includes(keyword)).length;
     
     // Check for specific high-priority scenarios
@@ -87,7 +81,7 @@ export class AIService {
     };
   }
 
-  async generateResponse(intent: string, text: string, context?: any): Promise<string> {
+  async generateResponse(intent, text, context) {
     const lowercaseText = text.toLowerCase();
     
     // Enhanced response generation with context awareness
@@ -161,13 +155,13 @@ export class AIService {
     }
 
     // Select a random response from the appropriate category
-    const responseArray = responses[responseKey as keyof typeof responses];
+    const responseArray = responses[responseKey];
     const randomIndex = Math.floor(Math.random() * responseArray.length);
     
     return responseArray[randomIndex];
   }
 
-  async suggestCategories(text: string): Promise<string[]> {
+  async suggestCategories(text) {
     const analysis = await this.classifyComplaint(text);
     const suggestions = [analysis.category];
     
@@ -186,9 +180,9 @@ export class AIService {
     return suggestions.slice(0, 3); // Return top 3 suggestions
   }
 
-  async extractKeywords(text: string): Promise<string[]> {
+  async extractKeywords(text) {
     const lowercaseText = text.toLowerCase();
-    const allKeywords: string[] = [];
+    const allKeywords = [];
     
     // Extract keywords from all categories
     for (const keywords of Object.values(this.keywords)) {
@@ -207,3 +201,5 @@ export class AIService {
     return [...new Set(allKeywords)];
   }
 }
+
+export { AIService };

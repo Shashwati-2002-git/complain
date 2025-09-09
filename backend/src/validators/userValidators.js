@@ -1,6 +1,6 @@
 import Joi from 'joi';
 
-export const validateUser = (user: any) => {
+const validateUser = (user) => {
   const schema = Joi.object({
     firstName: Joi.string().min(2).max(50).required(),
     lastName: Joi.string().min(2).max(50).required(),
@@ -28,7 +28,7 @@ export const validateUser = (user: any) => {
   return schema.validate(user);
 };
 
-export const validateLogin = (credentials: any) => {
+const validateLogin = (credentials) => {
   const schema = Joi.object({
     email: Joi.string().email().required(),
     password: Joi.string().required()
@@ -37,7 +37,7 @@ export const validateLogin = (credentials: any) => {
   return schema.validate(credentials);
 };
 
-export const validateUserUpdate = (user: any) => {
+const validateUserUpdate = (user) => {
   const schema = Joi.object({
     firstName: Joi.string().min(2).max(50).optional(),
     lastName: Joi.string().min(2).max(50).optional(),
@@ -61,7 +61,7 @@ export const validateUserUpdate = (user: any) => {
   return schema.validate(user);
 };
 
-export const validatePasswordChange = (data: any) => {
+const validatePasswordChange = (data) => {
   const schema = Joi.object({
     currentPassword: Joi.string().required(),
     newPassword: Joi.string().min(8).pattern(new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])')).required()
@@ -71,4 +71,11 @@ export const validatePasswordChange = (data: any) => {
   });
 
   return schema.validate(data);
+};
+
+export {
+  validateUser,
+  validateLogin,
+  validateUserUpdate,
+  validatePasswordChange
 };

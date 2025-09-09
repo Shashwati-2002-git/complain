@@ -1,32 +1,20 @@
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
 
 const connectDB = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/complaint_management';
+    const mongoURI = process.env.MONGODB_URI || process.env.MONGO_URI;
     
-    const conn = await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    if (!mongoURI) {
+      throw new Error('MONGODB_URI is not defined in environment variables');
+    }
 
-    console.log(`🗄️  MongoDB Connected: ${conn.connection.host}`);
+    await mongoose.connect(mongoURI);
+    console.log("✅ MongoDB Connected...");
+    console.log(`📊 Database: ${mongoose.connection.name}`);
   } catch (error) {
-    console.error('❌ Database connection error:', error.message);
+    console.error("❌ MongoDB Connection Error:", error.message);
     process.exit(1);
   }
 };
 
-// Handle connection events
-mongoose.connection.on('connected', () => {
-  console.log('📦 Mongoose connected to MongoDB');
-});
-
-mongoose.connection.on('error', (err) => {
-  console.error('❌ Mongoose connection error:', err);
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.log('📦 Mongoose disconnected');
-});
-
-module.exports = { connectDB };
+export default connectDB;

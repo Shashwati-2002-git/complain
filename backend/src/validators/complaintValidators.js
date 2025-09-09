@@ -1,6 +1,6 @@
 import Joi from 'joi';
 
-export const validateComplaint = (complaint: any) => {
+const validateComplaint = (complaint) => {
   const schema = Joi.object({
     title: Joi.string().min(5).max(200).required(),
     description: Joi.string().min(10).max(5000).required(),
@@ -11,7 +11,7 @@ export const validateComplaint = (complaint: any) => {
   return schema.validate(complaint);
 };
 
-export const validateComplaintUpdate = (update: any) => {
+const validateComplaintUpdate = (update) => {
   const schema = Joi.object({
     message: Joi.string().min(1).max(2000).required(),
     type: Joi.string().valid('status_change', 'comment', 'assignment', 'escalation', 'resolution').optional(),
@@ -22,7 +22,7 @@ export const validateComplaintUpdate = (update: any) => {
   return schema.validate(update);
 };
 
-export const validateComplaintFilter = (filter: any) => {
+const validateComplaintFilter = (filter) => {
   const schema = Joi.object({
     status: Joi.string().valid('Open', 'In Progress', 'Under Review', 'Resolved', 'Closed', 'Escalated').optional(),
     category: Joi.string().valid('Billing', 'Technical', 'Service', 'Product', 'General').optional(),
@@ -39,11 +39,18 @@ export const validateComplaintFilter = (filter: any) => {
   return schema.validate(filter);
 };
 
-export const validateFeedback = (feedback: any) => {
+const validateFeedback = (feedback) => {
   const schema = Joi.object({
     rating: Joi.number().min(1).max(5).required(),
     comment: Joi.string().max(1000).optional().allow('')
   });
 
   return schema.validate(feedback);
+};
+
+export {
+  validateComplaint,
+  validateComplaintUpdate,
+  validateComplaintFilter,
+  validateFeedback
 };

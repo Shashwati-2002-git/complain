@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const complaintSchema = new mongoose.Schema({
   title: {
@@ -288,4 +288,4 @@ complaintSchema.index({ complaintId: 1 });
 complaintSchema.index({ assignedTo: 1 });
 complaintSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('Complaint', complaintSchema);
+export const Complaint = mongoose.model('Complaint', complaintSchema);

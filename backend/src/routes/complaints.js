@@ -1,15 +1,15 @@
 import express from 'express';
-import { Complaint } from '../models/Complaint';
-import { authenticate, authorize } from '../middleware/auth';
-import { asyncHandler } from '../middleware/errorHandler';
-import { validateComplaint, validateComplaintUpdate } from '../validators/complaintValidators';
-import { AIService } from '../services/aiService';
+import { Complaint } from '../models/Complaint.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/errorHandler.js';
+import { validateComplaint, validateComplaintUpdate } from '../validators/complaintValidators.js';
+import { AIService } from '../services/aiService.js';
 
 const router = express.Router();
 const aiService = new AIService();
 
 // Get all complaints (with filters)
-router.get('/', authenticate, asyncHandler(async (req: any, res: any) => {
+router.get('/', authenticate, asyncHandler(async (req, res) => {
   const {
     status,
     category,
@@ -24,8 +24,8 @@ router.get('/', authenticate, asyncHandler(async (req: any, res: any) => {
   } = req.query;
 
   // Build filter object
-  const filter: any = {};
-  
+  const filter = {};
+
   // Regular users can only see their own complaints
   if (req.user.role === 'user') {
     filter.userId = req.user._id;
@@ -51,7 +51,7 @@ router.get('/', authenticate, asyncHandler(async (req: any, res: any) => {
   const skip = (parseInt(page) - 1) * parseInt(limit);
 
   // Build sort object
-  const sort: any = {};
+  const sort = {};
   sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
   const complaints = await Complaint.find(filter)
@@ -74,7 +74,7 @@ router.get('/', authenticate, asyncHandler(async (req: any, res: any) => {
 }));
 
 // Get complaint by ID
-router.get('/:id', authenticate, asyncHandler(async (req: any, res: any) => {
+router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   const complaint = await Complaint.findById(req.params.id)
     .populate('userId', 'firstName lastName email profile')
     .populate('assignedTo', 'firstName lastName email department')
@@ -93,7 +93,7 @@ router.get('/:id', authenticate, asyncHandler(async (req: any, res: any) => {
 }));
 
 // Create new complaint
-router.post('/', authenticate, asyncHandler(async (req: any, res: any) => {
+router.post('/', authenticate, asyncHandler(async (req, res) => {
   const { error } = validateComplaint(req.body);
   if (error) {
     return res.status(400).json({ error: error.details[0].message });
@@ -141,15 +141,11 @@ router.post('/', authenticate, asyncHandler(async (req: any, res: any) => {
   });
 
   await complaint.save();
-
-  // Auto-assign if enabled (implement logic based on category and workload)
-  // TODO: Implement auto-assignment logic
-
   res.status(201).json(complaint);
 }));
 
 // Update complaint status
-router.patch('/:id/status', authenticate, authorize('agent', 'admin'), asyncHandler(async (req: any, res: any) => {
+router.patch('/:id/status', authenticate, authorize('agent', 'admin'), asyncHandler(async (req, res) => {
   const { status, message } = req.body;
 
   if (!status) {
@@ -177,10 +173,10 @@ router.patch('/:id/status', authenticate, authorize('agent', 'admin'), asyncHand
     author: `${req.user.firstName} ${req.user.lastName}`,
     authorId: req.user._id,
     timestamp: new Date(),
-    type: 'status_change' as const,
+    type: 'status_change',
     isInternal: false
   };
-  complaint.updates.push(updateRecord as any);
+  complaint.updates.push(updateRecord);
 
   // Calculate resolution time if resolved
   if (status === 'Resolved' && !complaint.metrics.resolutionTime) {
@@ -202,7 +198,7 @@ router.patch('/:id/status', authenticate, authorize('agent', 'admin'), asyncHand
 }));
 
 // Assign complaint to agent
-router.patch('/:id/assign', authenticate, authorize('admin', 'agent'), asyncHandler(async (req: any, res: any) => {
+router.patch('/:id/assign', authenticate, authorize('admin', 'agent'), asyncHandler(async (req, res) => {
   const { agentId } = req.body;
 
   if (!agentId) {
@@ -242,7 +238,7 @@ router.patch('/:id/assign', authenticate, authorize('admin', 'agent'), asyncHand
 }));
 
 // Add comment/update to complaint
-router.post('/:id/updates', authenticate, asyncHandler(async (req: any, res: any) => {
+router.post('/:id/updates', authenticate, asyncHandler(async (req, res) => {
   const { error } = validateComplaintUpdate(req.body);
   if (error) {
     return res.status(400).json({ error: error.details[0].message });
@@ -285,7 +281,7 @@ router.post('/:id/updates', authenticate, asyncHandler(async (req: any, res: any
 }));
 
 // Escalate complaint
-router.patch('/:id/escalate', authenticate, authorize('agent', 'admin'), asyncHandler(async (req: any, res: any) => {
+router.patch('/:id/escalate', authenticate, authorize('agent', 'admin'), asyncHandler(async (req, res) => {
   const { reason } = req.body;
 
   if (!reason) {
@@ -327,7 +323,7 @@ router.patch('/:id/escalate', authenticate, authorize('agent', 'admin'), asyncHa
 }));
 
 // Submit feedback
-router.post('/:id/feedback', authenticate, asyncHandler(async (req: any, res: any) => {
+router.post('/:id/feedback', authenticate, asyncHandler(async (req, res) => {
   const { rating, comment } = req.body;
 
   if (!rating || rating < 1 || rating > 5) {

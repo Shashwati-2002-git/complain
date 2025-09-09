@@ -1,13 +1,13 @@
 import express from 'express';
-import { Complaint } from '../models/Complaint';
-import { User } from '../models/User';
-import { authenticate, authorize } from '../middleware/auth';
-import { asyncHandler } from '../middleware/errorHandler';
+import { Complaint } from '../models/Complaint.js';
+import { User } from '../models/User.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/errorHandler.js';
 
 const router = express.Router();
 
 // Get system statistics
-router.get('/stats', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.get('/stats', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
     const totalAgents = await User.countDocuments({ role: 'agent', isActive: true });
@@ -22,13 +22,13 @@ router.get('/stats', authenticate, authorize('admin'), asyncHandler(async (req: 
       openComplaints,
       escalatedComplaints
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({ error: 'Failed to fetch system statistics' });
   }
 }));
 
 // Get all users with enhanced filtering
-router.get('/users', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.get('/users', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const {
     role,
     department,
@@ -40,7 +40,7 @@ router.get('/users', authenticate, authorize('admin'), asyncHandler(async (req: 
     sortOrder = 'desc'
   } = req.query;
 
-  const filter: any = {};
+  const filter = {};
   if (role) filter.role = role;
   if (department) filter.department = department;
   if (isActive !== undefined) filter.isActive = isActive === 'true';
@@ -54,7 +54,7 @@ router.get('/users', authenticate, authorize('admin'), asyncHandler(async (req: 
   }
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
-  const sort: any = {};
+  const sort = {};
   sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
   const users = await User.find(filter)
@@ -76,7 +76,7 @@ router.get('/users', authenticate, authorize('admin'), asyncHandler(async (req: 
 }));
 
 // Bulk update users
-router.patch('/users/bulk', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.patch('/users/bulk', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const { userIds, updates } = req.body;
 
   if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
@@ -97,13 +97,13 @@ router.patch('/users/bulk', authenticate, authorize('admin'), asyncHandler(async
       message: `${result.modifiedCount} users updated successfully`,
       modifiedCount: result.modifiedCount
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(400).json({ error: error.message });
   }
 }));
 
 // Get all complaints with admin-level access
-router.get('/complaints', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.get('/complaints', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const {
     status,
     category,
@@ -118,7 +118,7 @@ router.get('/complaints', authenticate, authorize('admin'), asyncHandler(async (
     dateTo
   } = req.query;
 
-  const filter: any = {};
+  const filter = {};
   if (status) filter.status = status;
   if (category) filter.category = category;
   if (priority) filter.priority = priority;
@@ -133,7 +133,7 @@ router.get('/complaints', authenticate, authorize('admin'), asyncHandler(async (
   }
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
-  const sort: any = {};
+  const sort = {};
   sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
   const complaints = await Complaint.find(filter)
@@ -156,7 +156,7 @@ router.get('/complaints', authenticate, authorize('admin'), asyncHandler(async (
 }));
 
 // Bulk assign complaints
-router.patch('/complaints/bulk-assign', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.patch('/complaints/bulk-assign', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const { complaintIds, agentId, teamName } = req.body;
 
   if (!complaintIds || !Array.isArray(complaintIds) || complaintIds.length === 0) {
@@ -173,7 +173,7 @@ router.patch('/complaints/bulk-assign', authenticate, authorize('admin'), asyncH
       return res.status(400).json({ error: 'Invalid agent ID' });
     }
 
-    const updateData: any = {
+    const updateData = {
       assignedTo: agentId,
       assignedTeam: teamName || agent.department,
       status: 'In Progress',
@@ -189,13 +189,13 @@ router.patch('/complaints/bulk-assign', authenticate, authorize('admin'), asyncH
       message: `${result.modifiedCount} complaints assigned successfully`,
       modifiedCount: result.modifiedCount
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(400).json({ error: error.message });
   }
 }));
 
 // Close multiple complaints
-router.patch('/complaints/bulk-close', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.patch('/complaints/bulk-close', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const { complaintIds, reason } = req.body;
 
   if (!complaintIds || !Array.isArray(complaintIds) || complaintIds.length === 0) {
@@ -227,13 +227,13 @@ router.patch('/complaints/bulk-close', authenticate, authorize('admin'), asyncHa
       message: `${result.modifiedCount} complaints closed successfully`,
       modifiedCount: result.modifiedCount
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(400).json({ error: error.message });
   }
 }));
 
 // Get system configuration
-router.get('/config', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.get('/config', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   // Return system configuration that can be modified
   const config = {
     slaTargets: {
@@ -269,7 +269,7 @@ router.get('/config', authenticate, authorize('admin'), asyncHandler(async (req:
 }));
 
 // Update system configuration
-router.patch('/config', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.patch('/config', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   // In a real application, you would save this to a configuration collection
   // For now, we'll just validate and return the updated configuration
   const { slaTargets, autoAssignment, notifications, features } = req.body;
@@ -289,7 +289,7 @@ router.patch('/config', authenticate, authorize('admin'), asyncHandler(async (re
 }));
 
 // Export data
-router.get('/export/:type', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.get('/export/:type', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const { type } = req.params;
   const { format = 'json', dateFrom, dateTo } = req.query;
 
@@ -303,7 +303,7 @@ router.get('/export/:type', authenticate, authorize('admin'), asyncHandler(async
 
   try {
     let data;
-    const filter: any = {};
+    const filter = {};
 
     if (dateFrom || dateTo) {
       filter.createdAt = {};
@@ -330,7 +330,7 @@ router.get('/export/:type', authenticate, authorize('admin'), asyncHandler(async
       res.setHeader('Content-Disposition', `attachment; filename=${type}-export.json`);
       res.json(data);
     }
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({ error: 'Export failed' });
   }
 }));

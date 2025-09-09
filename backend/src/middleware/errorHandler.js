@@ -1,64 +1,41 @@
-import { Request, Response, NextFunction } from 'express';
-
-interface ErrorResponse {
-  error: string;
-  details?: any;
-  stack?: string;
-}
-
-export const errorHandler = (
-  err: any,
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
+// Error handling middleware
+const errorHandler = (err, req, res, next) => {
   console.error(err.stack);
 
   // Mongoose validation error
   if (err.name === 'ValidationError') {
-    const errors = Object.values(err.errors).map((e: any) => e.message);
-    res.status(400).json({
+    const errors = Object.values(err.errors).map(e => e.message);
+    return res.status(400).json({
       error: 'Validation Error',
       details: errors
     });
-    return;
   }
 
   // Mongoose duplicate key error
   if (err.code === 11000) {
     const field = Object.keys(err.keyValue)[0];
-    res.status(400).json({
+    return res.status(400).json({
       error: `Duplicate ${field}`,
       details: `${field} already exists`
     });
-    return;
   }
 
   // JWT errors
   if (err.name === 'JsonWebTokenError') {
-    res.status(401).json({
-      error: 'Invalid token'
-    });
-    return;
+    return res.status(401).json({ error: 'Invalid token' });
   }
 
   if (err.name === 'TokenExpiredError') {
-    res.status(401).json({
-      error: 'Token expired'
-    });
-    return;
+    return res.status(401).json({ error: 'Token expired' });
   }
 
   // Cast error (invalid ObjectId)
   if (err.name === 'CastError') {
-    res.status(400).json({
-      error: 'Invalid ID format'
-    });
-    return;
+    return res.status(400).json({ error: 'Invalid ID format' });
   }
 
   // Default error
-  const response: ErrorResponse = {
+  const response = {
     error: err.message || 'Internal Server Error'
   };
 
@@ -70,12 +47,16 @@ export const errorHandler = (
   res.status(err.statusCode || 500).json(response);
 };
 
-export const notFound = (req: Request, res: Response, next: NextFunction): void => {
+// 404 handler
+const notFound = (req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
   res.status(404);
   next(error);
 };
 
-export const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+// Async wrapper to catch errors in async route handlers
+const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
+
+export { errorHandler, notFound, asyncHandler };
