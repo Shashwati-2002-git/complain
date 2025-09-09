@@ -22,7 +22,6 @@ import {
   Users,
   BarChart3,
   MessageCircle,
-  Timer,
   Activity,
   ChevronRight
 } from 'lucide-react';
@@ -123,13 +122,6 @@ export function AgentDashboard() {
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar className="w-4 h-4" />
                   <span>{new Date().toLocaleDateString()}</span>
-                </div>
-              </div>
-              <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-                <div className="flex items-center gap-2 text-sm">
-                  <Timer className="w-4 h-4" />
-                  <span>Online</span>
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 </div>
               </div>
             </div>
