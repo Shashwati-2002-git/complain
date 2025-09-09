@@ -55,11 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await response.json();
         const userData = {
           id: data.user.id,
-          firstName: data.user.firstName,
-          lastName: data.user.lastName,
-          name: `${data.user.firstName} ${data.user.lastName}`,
+          firstName: data.user.name.split(' ')[0],
+          lastName: data.user.name.split(' ').slice(1).join(' ') || '',
+          name: data.user.name,
           email: data.user.email,
-          role: data.user.role,
+          role: 'user' as const, // Default role
         };
         
         localStorage.setItem('token', data.token);
@@ -119,20 +119,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (name: string, email: string, password: string, role: 'user' | 'agent' | 'admin' = 'user'): Promise<boolean> => {
     try {
-      const [firstName, ...lastNameParts] = name.split(' ');
-      const lastName = lastNameParts.join(' ') || '';
-
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          firstName,
-          lastName, 
+          name,
           email, 
           password,
-          role: role 
         }),
       });
 
@@ -140,11 +135,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await response.json();
         const userData = {
           id: data.user.id,
-          firstName: data.user.firstName,
-          lastName: data.user.lastName,
-          name: `${data.user.firstName} ${data.user.lastName}`,
+          firstName: data.user.name.split(' ')[0],
+          lastName: data.user.name.split(' ').slice(1).join(' ') || '',
+          name: data.user.name,
           email: data.user.email,
-          role: data.user.role,
+          role: 'user' as const,
         };
         
         localStorage.setItem('token', data.token);
