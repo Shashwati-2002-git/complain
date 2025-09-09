@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Complaint, useComplaints } from '../../contexts/ComplaintContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { 
@@ -198,7 +198,7 @@ export function ComplaintDetails({ complaint, onBack, onUpdate, isAgent = false 
                     {isAgent && (
                       <select
                         value={newStatus}
-                        onChange={(e) => setNewStatus(e.target.value)}
+                        onChange={(e) => setNewStatus(e.target.value as typeof complaint.status)}
                         className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       >
                         <option value="Open">Open</option>
