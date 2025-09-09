@@ -131,19 +131,19 @@ export function AdminDashboard() {
   // Overview Dashboard
   if (activeView === 'overview') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         <Header />
         
         <div className="container mx-auto px-4 py-8">
           {/* Admin Welcome Section */}
-          <div className="bg-gradient-to-r from-orange-600 via-red-600 to-purple-700 rounded-xl p-8 text-white mb-8 shadow-2xl">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-8 text-white mb-8 shadow-lg">
             <div className="flex justify-between items-start">
               <div>
                 <div className="flex items-center gap-3 mb-3">
-                  <Shield className="w-10 h-10 text-yellow-300" />
+                  <Shield className="w-10 h-10 text-white" />
                   <h1 className="text-4xl font-bold">Admin Control Center</h1>
                 </div>
-                <p className="text-orange-100 text-lg mb-6">
+                <p className="text-blue-100 text-lg mb-6">
                   🛡️ System-wide complaint management and administrative oversight
                   {stats.pendingAssignment > 0 && 
                   ` • ${stats.pendingAssignment} complaints need immediate assignment`}
@@ -152,14 +152,14 @@ export function AdminDashboard() {
                 <div className="flex flex-wrap gap-4">
                   <button
                     onClick={() => setActiveView('complaints')}
-                    className="bg-white text-orange-700 px-6 py-3 rounded-lg flex items-center gap-2 font-semibold hover:bg-gray-100 transition-colors shadow-lg"
+                    className="bg-white text-blue-700 px-6 py-3 rounded-lg flex items-center gap-2 font-semibold hover:bg-gray-50 transition-colors shadow-lg"
                   >
                     <FileText className="w-5 h-5" />
                     Manage All Complaints ({stats.open} active)
                   </button>
                   <button
                     onClick={() => setActiveView('users')}
-                    className="bg-white text-purple-700 px-6 py-3 rounded-lg flex items-center gap-2 font-semibold hover:bg-gray-100 transition-colors shadow-lg"
+                    className="bg-white bg-opacity-20 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-semibold hover:bg-opacity-30 transition-colors border border-white border-opacity-30"
                   >
                     <Shield className="w-5 h-5" />
                     User Management
@@ -176,9 +176,9 @@ export function AdminDashboard() {
               
               <div className="text-right">
                 <div className="bg-white bg-opacity-20 rounded-xl p-4 backdrop-blur-sm">
-                  <div className="text-3xl font-bold text-yellow-300">{todayComplaints}</div>
-                  <div className="text-orange-100">New Today</div>
-                  <div className="text-sm text-orange-200 mt-1">Admin View</div>
+                  <div className="text-3xl font-bold text-white">{todayComplaints}</div>
+                  <div className="text-blue-100">New Today</div>
+                  <div className="text-sm text-blue-200 mt-1">Admin View</div>
                 </div>
               </div>
             </div>
@@ -397,7 +397,7 @@ export function AdminDashboard() {
             >
               ← Back to Overview
             </button>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Complaint Management</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">QuickFix</h1>
             <p className="text-gray-600">
               Manage all customer complaints, assign to teams, and track resolution progress.
             </p>
