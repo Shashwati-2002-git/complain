@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const notificationSchema = new mongoose.Schema({
   user: {
@@ -211,4 +211,4 @@ notificationSchema.index({ expiresAt: 1 });
 notificationSchema.index({ scheduledFor: 1 });
 notificationSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('Notification', notificationSchema);
+export const Notification = mongoose.model('Notification', notificationSchema);

@@ -1,18 +1,18 @@
 import express from 'express';
-import { User } from '../models/User';
-import { authenticate, authorize } from '../middleware/auth';
-import { asyncHandler } from '../middleware/errorHandler';
-import { validateUserUpdate, validatePasswordChange } from '../validators/userValidators';
+import { User } from '../models/User.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/errorHandler.js';
+import { validateUserUpdate, validatePasswordChange } from '../validators/userValidators.js';
 
 const router = express.Router();
 
 // Get current user profile
-router.get('/profile', authenticate, asyncHandler(async (req: any, res: any) => {
+router.get('/profile', authenticate, asyncHandler(async (req, res) => {
   res.json(req.user);
 }));
 
 // Update user profile
-router.patch('/profile', authenticate, asyncHandler(async (req: any, res: any) => {
+router.patch('/profile', authenticate, asyncHandler(async (req, res) => {
   const { error } = validateUserUpdate(req.body);
   if (error) {
     return res.status(400).json({ error: error.details[0].message });
@@ -36,19 +36,19 @@ router.patch('/profile', authenticate, asyncHandler(async (req: any, res: any) =
       if (update === 'profile' || update === 'preferences') {
         user[update] = { ...user[update], ...req.body[update] };
       } else {
-        (user as any)[update] = req.body[update];
+        user[update] = req.body[update];
       }
     });
 
     await user.save();
     res.json(user);
-  } catch (error: any) {
+  } catch (error) {
     res.status(400).json({ error: error.message });
   }
 }));
 
 // Change password
-router.patch('/password', authenticate, asyncHandler(async (req: any, res: any) => {
+router.patch('/password', authenticate, asyncHandler(async (req, res) => {
   const { error } = validatePasswordChange(req.body);
   if (error) {
     return res.status(400).json({ error: error.details[0].message });
@@ -74,7 +74,7 @@ router.patch('/password', authenticate, asyncHandler(async (req: any, res: any) 
 }));
 
 // Get all users (admin only)
-router.get('/', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.get('/', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const {
     role,
     department,
@@ -85,7 +85,7 @@ router.get('/', authenticate, authorize('admin'), asyncHandler(async (req: any, 
   } = req.query;
 
   // Build filter object
-  const filter: any = {};
+  const filter = {};
   if (role) filter.role = role;
   if (department) filter.department = department;
   if (isActive !== undefined) filter.isActive = isActive === 'true';
@@ -120,7 +120,7 @@ router.get('/', authenticate, authorize('admin'), asyncHandler(async (req: any, 
 }));
 
 // Get user by ID (admin only)
-router.get('/:id', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.get('/:id', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id).select('-password');
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
@@ -129,7 +129,7 @@ router.get('/:id', authenticate, authorize('admin'), asyncHandler(async (req: an
 }));
 
 // Update user (admin only)
-router.patch('/:id', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.patch('/:id', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const { error } = validateUserUpdate(req.body);
   if (error) {
     return res.status(400).json({ error: error.details[0].message });
@@ -153,19 +153,19 @@ router.patch('/:id', authenticate, authorize('admin'), asyncHandler(async (req: 
       if (update === 'profile' || update === 'preferences') {
         user[update] = { ...user[update], ...req.body[update] };
       } else {
-        (user as any)[update] = req.body[update];
+        user[update] = req.body[update];
       }
     });
 
     await user.save();
     res.json(user);
-  } catch (error: any) {
+  } catch (error) {
     res.status(400).json({ error: error.message });
   }
 }));
 
 // Delete user (admin only)
-router.delete('/:id', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.delete('/:id', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
@@ -187,7 +187,7 @@ router.delete('/:id', authenticate, authorize('admin'), asyncHandler(async (req:
 }));
 
 // Get agents by department (admin only)
-router.get('/agents/:department', authenticate, authorize('admin', 'agent'), asyncHandler(async (req: any, res: any) => {
+router.get('/agents/:department', authenticate, authorize('admin', 'agent'), asyncHandler(async (req, res) => {
   const { department } = req.params;
   
   const agents = await User.find({

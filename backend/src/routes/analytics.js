@@ -1,13 +1,13 @@
 import express from 'express';
-import { Complaint } from '../models/Complaint';
-import { User } from '../models/User';
-import { authenticate, authorize } from '../middleware/auth';
-import { asyncHandler } from '../middleware/errorHandler';
+import { Complaint } from '../models/Complaint.js';
+import { User } from '../models/User.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/errorHandler.js';
 
 const router = express.Router();
 
 // Get analytics dashboard data
-router.get('/dashboard', authenticate, authorize('admin', 'agent'), asyncHandler(async (req: any, res: any) => {
+router.get('/dashboard', authenticate, authorize('admin', 'agent'), asyncHandler(async (req, res) => {
   const { timeRange = '30' } = req.query; // days
   const days = parseInt(timeRange);
   const startDate = new Date();
@@ -146,13 +146,13 @@ router.get('/dashboard', authenticate, authorize('admin', 'agent'), asyncHandler
       },
       timeRange: days
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({ error: 'Failed to fetch analytics data' });
   }
 }));
 
 // Get team performance metrics
-router.get('/team-performance', authenticate, authorize('admin'), asyncHandler(async (req: any, res: any) => {
+router.get('/team-performance', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
   const { timeRange = '30' } = req.query;
   const days = parseInt(timeRange);
   const startDate = new Date();
@@ -215,13 +215,13 @@ router.get('/team-performance', authenticate, authorize('admin'), asyncHandler(a
     ]);
 
     res.json(teamPerformance);
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({ error: 'Failed to fetch team performance data' });
   }
 }));
 
 // Get complaint trends by category
-router.get('/trends/category', authenticate, authorize('admin', 'agent'), asyncHandler(async (req: any, res: any) => {
+router.get('/trends/category', authenticate, authorize('admin', 'agent'), asyncHandler(async (req, res) => {
   const { timeRange = '90' } = req.query;
   const days = parseInt(timeRange);
   const startDate = new Date();
@@ -254,13 +254,13 @@ router.get('/trends/category', authenticate, authorize('admin', 'agent'), asyncH
     ]);
 
     res.json(trends);
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({ error: 'Failed to fetch category trends' });
   }
 }));
 
 // Get SLA compliance report
-router.get('/sla-compliance', authenticate, authorize('admin', 'agent'), asyncHandler(async (req: any, res: any) => {
+router.get('/sla-compliance', authenticate, authorize('admin', 'agent'), asyncHandler(async (req, res) => {
   const { timeRange = '30' } = req.query;
   const days = parseInt(timeRange);
   const startDate = new Date();
@@ -322,7 +322,7 @@ router.get('/sla-compliance', authenticate, authorize('admin', 'agent'), asyncHa
     ]);
 
     res.json(slaCompliance);
-  } catch (error: any) {
+  } catch (error) {
     res.status(500).json({ error: 'Failed to fetch SLA compliance data' });
   }
 }));
