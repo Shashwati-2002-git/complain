@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           lastName: data.user.name.split(' ').slice(1).join(' ') || '',
           name: data.user.name,
           email: data.user.email,
-          role: 'user' as const, // Default role
+          role: data.user.role,
         };
         
         localStorage.setItem('token', data.token);
@@ -128,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name,
           email, 
           password,
+          role,
         }),
       });
 
@@ -139,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           lastName: data.user.name.split(' ').slice(1).join(' ') || '',
           name: data.user.name,
           email: data.user.email,
-          role: 'user' as const,
+          role: data.user.role,
         };
         
         localStorage.setItem('token', data.token);

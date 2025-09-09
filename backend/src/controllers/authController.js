@@ -27,7 +27,7 @@ const validateSignup = (name, email, password) => {
 
 // Signup
 export const registerUser = async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, role = 'user' } = req.body;
   
   try {
     // Validate input
@@ -39,14 +39,31 @@ export const registerUser = async (req, res) => {
       });
     }
 
+    // Validate role
+    if (role && !['user', 'admin', 'agent'].includes(role)) {
+      return res.status(400).json({ 
+        message: "Invalid role. Must be 'user', 'admin', or 'agent'" 
+      });
+    }
+
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: "User already exists with this email" });
     }
 
-    const user = await User.create({ name: name.trim(), email: email.toLowerCase().trim(), password });
+    const user = await User.create({ 
+      name: name.trim(), 
+      email: email.toLowerCase().trim(), 
+      password,
+      role 
+    });
     
-    console.log("User created successfully:", { id: user._id, name: user.name, email: user.email });
+    console.log("User created successfully:", { 
+      id: user._id, 
+      name: user.name, 
+      email: user.email, 
+      role: user.role 
+    });
     
     res.status(201).json({
       success: true,
@@ -54,6 +71,7 @@ export const registerUser = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        role: user.role,
       },
       token: generateToken(user._id),
     });
@@ -75,7 +93,12 @@ export const loginUser = async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase().trim() });
 
     if (user && (await user.matchPassword(password))) {
-      console.log("User logged in successfully:", { id: user._id, name: user.name, email: user.email });
+      console.log("User logged in successfully:", { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role 
+      });
       
       res.json({
         success: true,
@@ -83,6 +106,7 @@ export const loginUser = async (req, res) => {
           id: user._id,
           name: user.name,
           email: user.email,
+          role: user.role,
         },
         token: generateToken(user._id),
       });
