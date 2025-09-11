@@ -19,7 +19,7 @@ export function Header() {
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-800">ComplaintHub</h1>
+              <h1 className="text-xl font-bold text-gray-800">QuickFix</h1>
               <p className="text-xs text-gray-500">AI-Powered Support</p>
             </div>
           </div>

@@ -1,14 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Complaint, useComplaints } from '../../contexts/ComplaintContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { 
   Clock, 
-  AlertTriangle, 
-  CheckCircle, 
-  MessageSquare, 
   User,
   Calendar,
-  Tag,
   MoreHorizontal,
   UserCheck,
   Eye,
@@ -29,7 +25,7 @@ export function ComplaintCard({ complaint, showActions, isAdmin = false, isAgent
   const [showDetails, setShowDetails] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
-  const { updateComplaintStatus, assignComplaint, addComplaintUpdate } = useComplaints();
+  const { updateComplaintStatus, assignComplaint } = useComplaints();
   const { addNotification } = useNotifications();
 
   const isResolved = complaint.status === 'Resolved' || complaint.status === 'Closed';
