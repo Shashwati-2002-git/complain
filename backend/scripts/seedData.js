@@ -1,24 +1,30 @@
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-import { User } from '../src/models/User';
-import { Complaint } from '../src/models/Complaint';
+const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+const path = require('path');
 
-// Load environment variables
-dotenv.config();
+// Load env file
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+// Import models
+const { User } = require('../src/models/User');
+const { Complaint } = require('../src/models/Complaint');
 
 const seedData = async () => {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI!);
-    console.log('Connected to MongoDB');
+    if (!process.env.MONGODB_URI) {
+      throw new Error('❌ MONGODB_URI not found in .env file');
+    }
 
-    // Clear existing data
-    await User.deleteMany({});
-    await Complaint.deleteMany({});
-    console.log('Cleared existing data');
+    // Connect to MongoDB
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('✅ Connected to MongoDB');
+
+    // Clear collections
+    await Promise.all([User.deleteMany({}), Complaint.deleteMany({})]);
+    console.log('🧹 Cleared existing data');
 
     // Create admin user
-    const admin = new User({
+    const admin = await User.create({
       firstName: 'Admin',
       lastName: 'User',
       email: 'admin@complaint-system.com',
@@ -28,11 +34,10 @@ const seedData = async () => {
       emailVerified: true,
       isActive: true
     });
-    await admin.save();
-    console.log('Created admin user');
+    console.log('👑 Created admin user');
 
-    // Create agent users
-    const agents = [
+    // Create agents
+    const agents = await User.insertMany([
       {
         firstName: 'Alex',
         lastName: 'Kumar',
@@ -73,13 +78,11 @@ const seedData = async () => {
         emailVerified: true,
         isActive: true
       }
-    ];
+    ]);
+    console.log('👩‍💻 Created agent users');
 
-    const createdAgents = await User.insertMany(agents);
-    console.log('Created agent users');
-
-    // Create regular users
-    const users = [
+    // Create users
+    const users = await User.insertMany([
       {
         firstName: 'John',
         lastName: 'Doe',
@@ -88,10 +91,7 @@ const seedData = async () => {
         role: 'user',
         emailVerified: true,
         isActive: true,
-        profile: {
-          phone: '+1-555-0123',
-          company: 'Acme Corp'
-        }
+        profile: { phone: '+1-555-0123', company: 'Acme Corp' }
       },
       {
         firstName: 'Jane',
@@ -101,10 +101,7 @@ const seedData = async () => {
         role: 'user',
         emailVerified: true,
         isActive: true,
-        profile: {
-          phone: '+1-555-0456',
-          company: 'Tech Solutions Inc'
-        }
+        profile: { phone: '+1-555-0456', company: 'Tech Solutions Inc' }
       },
       {
         firstName: 'Bob',
@@ -114,29 +111,25 @@ const seedData = async () => {
         role: 'user',
         emailVerified: true,
         isActive: true,
-        profile: {
-          phone: '+1-555-0789',
-          company: 'Digital Dynamics'
-        }
+        profile: { phone: '+1-555-0789', company: 'Digital Dynamics' }
       }
-    ];
+    ]);
+    console.log('🙋 Created regular users');
 
-    const createdUsers = await User.insertMany(users);
-    console.log('Created regular users');
-
-    // Create sample complaints
-    const complaints = [
+    // Create complaints
+    await Complaint.insertMany([
       {
-        userId: createdUsers[0]._id,
+        userId: users[0]._id,
         title: 'Internet connection keeps dropping',
-        description: 'My internet connection has been unstable for the past 3 days. It drops every 2-3 hours and I have to restart my router.',
+        description:
+          'My internet connection has been unstable for the past 3 days. It drops every 2-3 hours and I have to restart my router.',
         category: 'Technical',
         priority: 'High',
         status: 'In Progress',
         sentiment: 'Negative',
-        assignedTo: createdAgents[0]._id, // Alex Kumar
+        assignedTo: agents[0]._id,
         assignedTeam: 'Technical',
-        slaTarget: new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours from now
+        slaTarget: new Date(Date.now() + 6 * 60 * 60 * 1000),
         isEscalated: false,
         aiAnalysis: {
           confidence: 0.85,
@@ -145,9 +138,7 @@ const seedData = async () => {
           keywords: ['internet', 'connection', 'dropping', 'unstable'],
           processedAt: new Date()
         },
-        metrics: {
-          reopenCount: 0
-        },
+        metrics: { reopenCount: 0 },
         updates: [
           {
             message: 'Complaint has been created and classified automatically.',
@@ -164,121 +155,15 @@ const seedData = async () => {
             timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000),
             type: 'assignment',
             isInternal: false
-          },
-          {
-            message: 'I have investigated the issue and it appears to be related to your ISP. We are contacting them on your behalf.',
-            author: 'Alex Kumar',
-            authorId: createdAgents[0]._id,
-            timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
-            type: 'comment',
-            isInternal: false
           }
         ],
         createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
         updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000)
-      },
-      {
-        userId: createdUsers[0]._id,
-        title: 'Billing discrepancy in last month invoice',
-        description: 'I was charged twice for my monthly subscription. The amount $29.99 appears twice in my billing statement.',
-        category: 'Billing',
-        priority: 'Medium',
-        status: 'Resolved',
-        sentiment: 'Neutral',
-        assignedTo: createdAgents[1]._id, // Sarah Johnson
-        assignedTeam: 'Billing',
-        slaTarget: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago (SLA met)
-        isEscalated: false,
-        aiAnalysis: {
-          confidence: 0.92,
-          suggestedCategory: 'Billing',
-          suggestedPriority: 'Medium',
-          keywords: ['billing', 'charged', 'subscription', 'duplicate'],
-          processedAt: new Date()
-        },
-        metrics: {
-          resolutionTime: 18,
-          customerSatisfaction: 4,
-          reopenCount: 0
-        },
-        feedback: {
-          rating: 4,
-          comment: 'Issue was resolved quickly and professionally.',
-          submittedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
-          submittedBy: createdUsers[0]._id
-        },
-        updates: [
-          {
-            message: 'Complaint has been created and classified automatically.',
-            author: 'System',
-            authorId: admin._id,
-            timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-            type: 'status_change',
-            isInternal: false
-          },
-          {
-            message: 'I have reviewed your billing and confirmed the duplicate charge. A refund of $29.99 has been processed.',
-            author: 'Sarah Johnson',
-            authorId: createdAgents[1]._id,
-            timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-            type: 'comment',
-            isInternal: false
-          }
-        ],
-        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-        updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000)
-      },
-      {
-        userId: createdUsers[1]._id,
-        title: 'Application crashes when uploading files',
-        description: 'Every time I try to upload a file larger than 5MB, the application crashes and I lose all my work. This is very frustrating!',
-        category: 'Technical',
-        priority: 'Urgent',
-        status: 'Escalated',
-        sentiment: 'Negative',
-        assignedTo: createdAgents[2]._id, // David Park
-        assignedTeam: 'Technical',
-        slaTarget: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago (SLA breached)
-        isEscalated: true,
-        escalationReason: 'SLA breach - critical issue affecting user productivity',
-        escalatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        aiAnalysis: {
-          confidence: 0.88,
-          suggestedCategory: 'Technical',
-          suggestedPriority: 'Urgent',
-          keywords: ['application', 'crashes', 'uploading', 'files', 'frustrating'],
-          processedAt: new Date()
-        },
-        metrics: {
-          reopenCount: 0
-        },
-        updates: [
-          {
-            message: 'Complaint has been created and classified automatically.',
-            author: 'System',
-            authorId: admin._id,
-            timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
-            type: 'status_change',
-            isInternal: false
-          },
-          {
-            message: 'Complaint escalated: SLA breach - critical issue affecting user productivity',
-            author: 'System',
-            authorId: admin._id,
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-            type: 'escalation',
-            isInternal: false
-          }
-        ],
-        createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
-        updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
       }
-    ];
+    ]);
+    console.log('📂 Created sample complaints');
 
-    await Complaint.insertMany(complaints);
-    console.log('Created sample complaints');
-
-    console.log('\n=== SEED DATA COMPLETE ===');
+    console.log('\n=== ✅ SEED DATA COMPLETE ===');
     console.log('\nTest Accounts Created:');
     console.log('Admin: admin@complaint-system.com / Admin123!');
     console.log('Agent (Technical): alex.kumar@complaint-system.com / Agent123!');
@@ -290,11 +175,10 @@ const seedData = async () => {
     console.log('User: bob.wilson@example.com / User123!');
 
     await mongoose.disconnect();
-    console.log('\nDisconnected from MongoDB');
+    console.log('🔌 Disconnected from MongoDB');
     process.exit(0);
-
-  } catch (error) {
-    console.error('Error seeding data:', error);
+  } catch (err) {
+    console.error('❌ Error seeding data:', err);
     await mongoose.disconnect();
     process.exit(1);
   }
