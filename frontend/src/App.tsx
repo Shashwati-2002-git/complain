@@ -2,18 +2,24 @@ import React, { useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { ComplaintProvider } from './contexts/ComplaintContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { SocketProvider } from './contexts/SocketContext';
 import { HomePage } from './components/home/HomePage';
 import { LoginForm } from './components/auth/LoginForm';
 import { UserDashboard } from './components/dashboard/UserDashboard';
 import { AdminDashboard } from './components/dashboard/AdminDashboard';
 import { AgentDashboard } from './components/dashboard/AgentDashboard';
+import { AnalyticsReportsDashboard } from './components/dashboard/AnalyticsReportsDashboard';
 import { ChatBot } from './components/chatbot/ChatBot';
 import { useAuth } from './contexts/AuthContext';
 import { Notifications } from './components/notifications/Notifications';
+import { useNotificationPermission } from './hooks/useSocket';
 
 function AppContent() {
   const { user, isAuthenticated } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
+
+  // Request notification permission
+  useNotificationPermission();
 
   // Debug logging
   console.log('AppContent - isAuthenticated:', isAuthenticated);
@@ -34,6 +40,7 @@ function AppContent() {
       {user?.role === 'admin' && <AdminDashboard />}
       {user?.role === 'agent' && <AgentDashboard />}
       {user?.role === 'user' && <UserDashboard />}
+      {user?.role === 'analytics' && <AnalyticsReportsDashboard />}
       {!user?.role && <div className="p-8 text-white">Loading user data...</div>}
       <ChatBot />
     </div>
@@ -43,11 +50,13 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <ComplaintProvider>
-        <NotificationProvider>
-          <AppContent />
-        </NotificationProvider>
-      </ComplaintProvider>
+      <SocketProvider>
+        <ComplaintProvider>
+          <NotificationProvider>
+            <AppContent />
+          </NotificationProvider>
+        </ComplaintProvider>
+      </SocketProvider>
     </AuthProvider>
   );
 }

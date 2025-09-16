@@ -23,19 +23,33 @@ import {
   BarChart3,
   MessageCircle,
   Activity,
-  ChevronRight
+  ChevronRight,
+  Edit3,
+  Send,
+  Phone,
+  Mail,
+  MessageSquare,
+  Plus,
+  Save,
+  Eye,
+  X
 } from 'lucide-react';
 
 export function AgentDashboard() {
   const { user } = useAuth();
   const { complaints, updateComplaintStatus, addComplaintUpdate } = useComplaints();
-  const [activeTab, setActiveTab] = useState<'overview' | 'my-tickets' | 'workload'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'my-tickets' | 'workload' | 'communication'>('overview');
   const [selectedComplaint, setSelectedComplaint] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteTicketId, setNoteTicketId] = useState<string>('');
+  const [internalNote, setInternalNote] = useState('');
+  const [communicationMessage, setCommunicationMessage] = useState('');
+  const [selectedCommunicationType, setSelectedCommunicationType] = useState<'email' | 'chat' | 'phone'>('email');
 
-  // Agent-specific data (in real app, this would be filtered by agent ID)
+  // Enhanced agent-specific data
   const myTickets = complaints.filter(c => c.assignedTo === user?.id || c.assignedTo === `Agent-${user?.id}`);
   const activeTickets = myTickets.filter(c => c.status === 'In Progress' || c.status === 'Open');
   const resolvedToday = myTickets.filter(c => 
@@ -134,10 +148,11 @@ export function AgentDashboard() {
             { id: 'overview', label: 'Overview', icon: BarChart3, description: 'Dashboard summary' },
             { id: 'my-tickets', label: 'My Tickets', icon: FileText, description: 'Assigned complaints' },
             { id: 'workload', label: 'Performance', icon: TrendingUp, description: 'Track metrics' },
+            { id: 'communication', label: 'Communication', icon: MessageCircle, description: 'Customer contact' },
           ].map(({ id, label, icon: Icon, description }) => (
             <button
               key={id}
-              onClick={() => setActiveTab(id as 'overview' | 'my-tickets' | 'workload')}
+              onClick={() => setActiveTab(id as 'overview' | 'my-tickets' | 'workload' | 'communication')}
               className={`group relative flex-1 flex flex-col items-center gap-2 px-6 py-4 rounded-lg font-medium transition-all duration-300 ${
                 activeTab === id
                   ? 'bg-blue-600 text-white shadow-lg transform scale-105'
@@ -615,7 +630,291 @@ export function AgentDashboard() {
             </div>
           </div>
         )}
+
+        {/* Communication Section */}
+        {activeTab === 'communication' && (
+          <div className="space-y-8">
+            {/* Communication Tools */}
+            <div className="grid lg:grid-cols-2 gap-8">
+              {/* Customer Communication */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="bg-blue-100 p-2 rounded-xl">
+                    <MessageCircle className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900">Customer Communication</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Select Ticket</label>
+                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                      <option value="">Choose a ticket to communicate about</option>
+                      {activeTickets.map(ticket => (
+                        <option key={ticket.id} value={ticket.id}>
+                          #{ticket.id} - {ticket.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Communication Type</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button 
+                        onClick={() => setSelectedCommunicationType('email')}
+                        className={`p-3 rounded-lg border transition-colors flex items-center justify-center gap-2 ${
+                          selectedCommunicationType === 'email' 
+                            ? 'bg-blue-50 border-blue-300 text-blue-700' 
+                            : 'border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Mail className="w-4 h-4" />
+                        Email
+                      </button>
+                      <button 
+                        onClick={() => setSelectedCommunicationType('chat')}
+                        className={`p-3 rounded-lg border transition-colors flex items-center justify-center gap-2 ${
+                          selectedCommunicationType === 'chat' 
+                            ? 'bg-green-50 border-green-300 text-green-700' 
+                            : 'border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        Chat
+                      </button>
+                      <button 
+                        onClick={() => setSelectedCommunicationType('phone')}
+                        className={`p-3 rounded-lg border transition-colors flex items-center justify-center gap-2 ${
+                          selectedCommunicationType === 'phone' 
+                            ? 'bg-purple-50 border-purple-300 text-purple-700' 
+                            : 'border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Phone className="w-4 h-4" />
+                        Phone
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                    <textarea
+                      value={communicationMessage}
+                      onChange={(e) => setCommunicationMessage(e.target.value)}
+                      rows={4}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 resize-none"
+                      placeholder="Type your message to the customer..."
+                    />
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                      <Send className="w-4 h-4" />
+                      Send Message
+                    </button>
+                    <button className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 flex items-center gap-2">
+                      <Plus className="w-4 h-4" />
+                      Add Template
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Internal Notes */}
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="bg-orange-100 p-2 rounded-xl">
+                    <Edit3 className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900">Internal Notes</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Select Ticket</label>
+                    <select 
+                      value={noteTicketId}
+                      onChange={(e) => setNoteTicketId(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Choose a ticket to add notes</option>
+                      {myTickets.map(ticket => (
+                        <option key={ticket.id} value={ticket.id}>
+                          #{ticket.id} - {ticket.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Internal Note</label>
+                    <textarea
+                      value={internalNote}
+                      onChange={(e) => setInternalNote(e.target.value)}
+                      rows={4}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 resize-none"
+                      placeholder="Add internal notes for other agents and admins..."
+                    />
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => {
+                        if (noteTicketId && internalNote.trim()) {
+                          // Add internal note logic here
+                          setInternalNote('');
+                          setNoteTicketId('');
+                        }
+                      }}
+                      className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      Save Note
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (noteTicketId) {
+                          setShowNoteModal(true);
+                        }
+                      }}
+                      disabled={!noteTicketId}
+                      className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                        noteTicketId 
+                          ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      <Eye className="w-4 h-4" />
+                      View Notes
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Communications */}
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-green-100 p-2 rounded-xl">
+                    <Activity className="w-5 h-5 text-green-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900">Recent Communications</h3>
+                </div>
+                <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                  View All →
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Mock communication history */}
+                {[
+                  { type: 'email', ticket: 'COMP-001', customer: 'John Doe', time: '2 hours ago', status: 'sent' },
+                  { type: 'chat', ticket: 'COMP-015', customer: 'Jane Smith', time: '4 hours ago', status: 'replied' },
+                  { type: 'phone', ticket: 'COMP-023', customer: 'Bob Wilson', time: '1 day ago', status: 'completed' },
+                ].map((comm, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-2 rounded-lg ${
+                        comm.type === 'email' ? 'bg-blue-100 text-blue-600' :
+                        comm.type === 'chat' ? 'bg-green-100 text-green-600' :
+                        'bg-purple-100 text-purple-600'
+                      }`}>
+                        {comm.type === 'email' ? <Mail className="w-4 h-4" /> :
+                         comm.type === 'chat' ? <MessageSquare className="w-4 h-4" /> :
+                         <Phone className="w-4 h-4" />}
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          {comm.type.charAt(0).toUpperCase() + comm.type.slice(1)} with {comm.customer}
+                        </div>
+                        <div className="text-sm text-gray-600">Ticket #{comm.ticket} • {comm.time}</div>
+                      </div>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      comm.status === 'sent' ? 'bg-blue-100 text-blue-800' :
+                      comm.status === 'replied' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {comm.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Communication Templates */}
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-purple-100 p-2 rounded-xl">
+                  <MessageSquare className="w-5 h-5 text-purple-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900">Quick Response Templates</h3>
+              </div>
+              
+              <div className="grid md:grid-cols-2 gap-4">
+                {[
+                  { title: 'Initial Response', preview: 'Thank you for contacting us. We have received your complaint and...' },
+                  { title: 'Status Update', preview: 'We wanted to update you on the progress of your case...' },
+                  { title: 'Resolution Notice', preview: 'Great news! We have resolved your complaint and...' },
+                  { title: 'Follow-up', preview: 'We hope your issue has been resolved to your satisfaction...' },
+                ].map((template, index) => (
+                  <div key={index} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <div className="font-medium text-gray-900 mb-2">{template.title}</div>
+                    <div className="text-sm text-gray-600 line-clamp-2">{template.preview}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Internal Notes Modal */}
+      {showNoteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-gray-900">Internal Notes - Ticket #{noteTicketId}</h3>
+              <button 
+                onClick={() => setShowNoteModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Mock notes - in real app, this would come from the ticket's internal notes */}
+              <div className="border-l-4 border-blue-500 pl-4 py-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-gray-900">Agent John Doe</span>
+                  <span className="text-sm text-gray-500">2 hours ago</span>
+                </div>
+                <p className="text-gray-700">Customer seems frustrated. Escalating to senior technical team for faster resolution.</p>
+              </div>
+              
+              <div className="border-l-4 border-green-500 pl-4 py-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-gray-900">Agent Sarah Smith</span>
+                  <span className="text-sm text-gray-500">1 day ago</span>
+                </div>
+                <p className="text-gray-700">Initial troubleshooting completed. Waiting for customer to test the proposed solution.</p>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button 
+                onClick={() => setShowNoteModal(false)}
+                className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,7 +9,7 @@ const validateUser = (user) => {
       .messages({
         'string.pattern.base': 'Password must contain at least one lowercase letter, one uppercase letter, one number, and one special character'
       }),
-    role: Joi.string().valid('user', 'agent', 'admin').optional(),
+    role: Joi.string().valid('user', 'agent', 'admin', 'analytics').optional(),
     department: Joi.string().valid('Billing', 'Technical', 'Customer Service', 'Product', 'General').optional(),
     profile: Joi.object({
       phone: Joi.string().pattern(/^\+?[\d\s-()]+$/).optional(),

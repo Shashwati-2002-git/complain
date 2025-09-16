@@ -1,14 +1,16 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 
+// User interface
 interface User {
   id: string;
   firstName: string;
   lastName: string;
   name: string;
   email: string;
-  role: "user" | "agent" | "admin";
+  role: "user" | "agent" | "admin" | "analytics";
 }
 
+// Auth context interface
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -18,9 +20,14 @@ interface AuthContextType {
     name: string,
     email: string,
     password: string,
-    role?: "user" | "agent" | "admin"
+    role?: "user" | "agent" | "admin" | "analytics"
   ) => Promise<boolean>;
   googleLogin: (token: string) => Promise<boolean>;
+  googleSignupWithRole: (
+    token: string,
+    role: "user" | "agent" | "admin" | "analytics"
+  ) => Promise<boolean>;
+  decodeGoogleToken: (token: string) => Promise<{ name: string; email: string } | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,11 +37,10 @@ const API_BASE_URL = "http://localhost:5000/api";
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
-  // Load user from localStorage if already logged in
+  // Load user from localStorage
   useEffect(() => {
     const token = localStorage.getItem("token");
     const savedUser = localStorage.getItem("user");
-
     if (token && savedUser) {
       try {
         const userData = JSON.parse(savedUser);
@@ -47,6 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const isAuthenticated = !!user;
+
+  // Login
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -56,12 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (!response.ok) return false;
-
       const data = await response.json();
       const userData: User = {
         id: data.user.id,
-        firstName: data.user.name.split(" ")[0],
-        lastName: data.user.name.split(" ").slice(1).join(" ") || "",
+        firstName: data.user.firstName || data.user.name.split(" ")[0],
+        lastName: data.user.lastName || data.user.name.split(" ").slice(1).join(" ") || "",
         name: data.user.name,
         email: data.user.email,
         role: data.user.role,
@@ -70,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(userData));
       setUser(userData);
+
       return true;
     } catch (error) {
       console.error("Login error:", error);
@@ -77,11 +86,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Register
   const register = async (
     name: string,
     email: string,
     password: string,
-    role: "user" | "agent" | "admin" = "user"
+    role: "user" | "agent" | "admin" | "analytics" = "user"
   ): Promise<boolean> => {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/signup`, {
@@ -91,12 +101,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (!response.ok) return false;
-
       const data = await response.json();
       const userData: User = {
         id: data.user.id,
-        firstName: data.user.name.split(" ")[0],
-        lastName: data.user.name.split(" ").slice(1).join(" ") || "",
+        firstName: data.user.firstName || data.user.name.split(" ")[0],
+        lastName: data.user.lastName || data.user.name.split(" ").slice(1).join(" ") || "",
         name: data.user.name,
         email: data.user.email,
         role: data.user.role,
@@ -105,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(userData));
       setUser(userData);
+
       return true;
     } catch (error) {
       console.error("Registration error:", error);
@@ -112,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Google login
   const googleLogin = async (token: string): Promise<boolean> => {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/google`, {
@@ -121,7 +132,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (!response.ok) return false;
-
       const data = await response.json();
       const userData: User = {
         id: data.user.id,
@@ -135,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(userData));
       setUser(userData);
+
       return true;
     } catch (error) {
       console.error("Google login error:", error);
@@ -142,6 +153,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Google signup with role
+  const googleSignupWithRole = async (
+    token: string,
+    role: "user" | "agent" | "admin" | "analytics"
+  ): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/google-signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, role }),
+      });
+
+      if (!response.ok) return false;
+      const data = await response.json();
+      const userData: User = {
+        id: data.user.id,
+        firstName: data.user.name.split(" ")[0],
+        lastName: data.user.name.split(" ").slice(1).join(" ") || "",
+        name: data.user.name,
+        email: data.user.email,
+        role: data.user.role,
+      };
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(userData);
+
+      return true;
+    } catch (error) {
+      console.error("Google signup error:", error);
+      return false;
+    }
+  };
+
+  // Decode Google token
+  const decodeGoogleToken = async (token: string): Promise<{ name: string; email: string } | null> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/google-decode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return { name: data.name, email: data.email };
+    } catch (error) {
+      console.error("Google token decode error:", error);
+      return null;
+    }
+  };
+
+  // Logout
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -152,11 +216,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        isAuthenticated,
         login,
         logout,
         register,
         googleLogin,
+        googleSignupWithRole,
+        decodeGoogleToken,
       }}
     >
       {children}
@@ -164,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Custom hook
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within an AuthProvider");

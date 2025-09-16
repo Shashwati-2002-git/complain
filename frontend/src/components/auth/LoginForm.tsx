@@ -13,7 +13,7 @@ export function LoginForm({ onBack }: LoginFormProps) {
     name: '',
     email: '',
     password: '',
-    role: 'user' as 'user' | 'agent' | 'admin',
+    role: 'user' as 'user' | 'agent' | 'admin' | 'analytics',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -114,16 +114,30 @@ export function LoginForm({ onBack }: LoginFormProps) {
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        role: e.target.value as 'user' | 'agent' | 'admin',
+                        role: e.target.value as 'user' | 'agent' | 'admin' | 'analytics',
                       }))
                     }
                     className="w-full pl-10 pr-4 py-3 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
                     required={!isLogin}
                   >
-                    <option value="user">User</option>
-                    <option value="agent">Agent</option>
-                    <option value="admin">Admin</option>
+                    <option value="user">User - Submit and track complaints</option>
+                    <option value="agent">Agent - Handle assigned tickets</option>
+                    <option value="admin">Admin - Manage system and users</option>
+                    <option value="analytics">Analytics - View reports and analytics</option>
                   </select>
+
+                  {/* Role descriptions */}
+                  <div className="mt-2 text-sm text-gray-400">
+                    {formData.role === 'agent' && (
+                      <p>As an Agent, you can view assigned tickets, update status, add notes, and communicate with customers.</p>
+                    )}
+                    {formData.role === 'admin' && (
+                      <p>As an Admin, you can manage users, assign tickets, view all complaints, and access system settings.</p>
+                    )}
+                    {formData.role === 'analytics' && (
+                      <p>As an Analytics user, you get access to comprehensive reports, SLA tracking, performance metrics, and data export capabilities.</p>
+                    )}
+                  </div>
                 </div>
               </>
             )}

@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { 
   Plus, FileText, Clock, CheckCircle, AlertTriangle, Bell, User, 
   MessageCircle, Star, Search, Filter, ChevronRight, 
-  Eye, Calendar, Tag, Award, Edit3, X, Paperclip
+  Eye, Calendar, Tag, Award, Edit3, X, Paperclip,
+  Download, Upload, RefreshCw,
+  Shield, Key
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useComplaints, Complaint } from '../../contexts/ComplaintContext';
@@ -646,7 +648,7 @@ export function UserDashboard() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
         <Header />
         <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             <div className="mb-6">
               <button
                 onClick={() => setActiveView('dashboard')}
@@ -658,67 +660,228 @@ export function UserDashboard() {
               <p className="text-gray-600">Manage your account information and preferences</p>
             </div>
             
-            <div className="bg-white rounded-xl shadow-sm p-8">
-              <div className="grid md:grid-cols-2 gap-8">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
-                  <div className="space-y-4">
+            <div className="grid lg:grid-cols-3 gap-8">
+              {/* Personal Information */}
+              <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-8">
+                <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                  <User className="w-6 h-6 text-blue-600" />
+                  Personal Information
+                </h3>
+                
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                    <input
+                      type="text"
+                      value={user?.name || ''}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                    <input
+                      type="email"
+                      value={user?.email || ''}
+                      className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50"
+                      disabled
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                    <input
+                      type="tel"
+                      placeholder="+1 (555) 123-4567"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Company/Organization</label>
+                    <input
+                      type="text"
+                      placeholder="Your company name"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                    <input
+                      type="text"
+                      placeholder="Your address"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                
+                {/* Security Settings */}
+                <div className="mt-8 pt-8 border-t">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-green-600" />
+                    Security Settings
+                  </h4>
+                  
+                  <div className="space-y-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                      <input
-                        type="text"
-                        value={user?.name || ''}
-                        disabled
-                        className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50"
-                      />
+                      <h5 className="font-medium text-gray-900 mb-3">Change Password</h5>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                          <input
+                            type="password"
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                          <input
+                            type="password"
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                      <input
-                        type="email"
-                        value={user?.email || ''}
-                        disabled
-                        className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50"
-                      />
+                    
+                    <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex items-center gap-3">
+                        <Shield className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="font-medium text-green-900">Two-Factor Authentication</p>
+                          <p className="text-sm text-green-700">Add an extra layer of security to your account</p>
+                        </div>
+                      </div>
+                      <button className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">
+                        Enable 2FA
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                      <input
-                        type="tel"
-                        placeholder="Add your phone number"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
+                    
+                    <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center gap-3">
+                        <Key className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="font-medium text-blue-900">Account Recovery</p>
+                          <p className="text-sm text-blue-700">Set up recovery options for your account</p>
+                        </div>
+                      </div>
+                      <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+                        Configure
+                      </button>
                     </div>
                   </div>
                 </div>
                 
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Notification Preferences</h3>
-                  <div className="space-y-4">
-                    <label className="flex items-center">
-                      <input type="checkbox" defaultChecked className="rounded mr-3" />
-                      <span className="text-gray-700">Email notifications</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input type="checkbox" className="rounded mr-3" />
-                      <span className="text-gray-700">SMS notifications</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input type="checkbox" defaultChecked className="rounded mr-3" />
-                      <span className="text-gray-700">Status update alerts</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input type="checkbox" defaultChecked className="rounded mr-3" />
-                      <span className="text-gray-700">Assignment notifications</span>
-                    </label>
-                  </div>
+                <div className="mt-8 flex gap-4">
+                  <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium">
+                    Save Changes
+                  </button>
+                  <button className="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 font-medium">
+                    Cancel
+                  </button>
                 </div>
               </div>
               
-              <div className="mt-8 pt-6 border-t">
-                <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium">
-                  Save Changes
-                </button>
+              {/* Preferences & Settings Sidebar */}
+              <div className="space-y-6">
+                {/* Notification Preferences */}
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-purple-600" />
+                    Notifications
+                  </h3>
+                  <div className="space-y-3">
+                    <label className="flex items-center justify-between">
+                      <span className="text-gray-700">Email notifications</span>
+                      <input type="checkbox" defaultChecked className="rounded" />
+                    </label>
+                    <label className="flex items-center justify-between">
+                      <span className="text-gray-700">SMS notifications</span>
+                      <input type="checkbox" className="rounded" />
+                    </label>
+                    <label className="flex items-center justify-between">
+                      <span className="text-gray-700">Status updates</span>
+                      <input type="checkbox" defaultChecked className="rounded" />
+                    </label>
+                    <label className="flex items-center justify-between">
+                      <span className="text-gray-700">Promotional emails</span>
+                      <input type="checkbox" className="rounded" />
+                    </label>
+                    <label className="flex items-center justify-between">
+                      <span className="text-gray-700">Weekly summaries</span>
+                      <input type="checkbox" defaultChecked className="rounded" />
+                    </label>
+                  </div>
+                </div>
+                
+                {/* Privacy Settings */}
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-green-600" />
+                    Privacy
+                  </h3>
+                  <div className="space-y-3">
+                    <label className="flex items-center justify-between">
+                      <span className="text-gray-700">Profile visibility</span>
+                      <select className="border border-gray-300 rounded px-2 py-1 text-sm">
+                        <option>Private</option>
+                        <option>Public</option>
+                      </select>
+                    </label>
+                    <label className="flex items-center justify-between">
+                      <span className="text-gray-700">Data analytics</span>
+                      <input type="checkbox" defaultChecked className="rounded" />
+                    </label>
+                    <label className="flex items-center justify-between">
+                      <span className="text-gray-700">Cookie preferences</span>
+                      <button className="text-blue-600 text-sm hover:underline">Manage</button>
+                    </label>
+                  </div>
+                </div>
+                
+                {/* Account Actions */}
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Actions</h3>
+                  <div className="space-y-3">
+                    <button className="w-full flex items-center gap-2 p-3 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                      <Download className="w-4 h-4" />
+                      Download My Data
+                    </button>
+                    <button className="w-full flex items-center gap-2 p-3 text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
+                      <Upload className="w-4 h-4" />
+                      Export Complaints
+                    </button>
+                    <button className="w-full flex items-center gap-2 p-3 text-orange-600 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors">
+                      <RefreshCw className="w-4 h-4" />
+                      Reset Preferences
+                    </button>
+                    <button className="w-full flex items-center gap-2 p-3 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+                      <X className="w-4 h-4" />
+                      Delete Account
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Quick Stats */}
+                <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Statistics</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Member since</span>
+                      <span className="font-medium">Jan 2024</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Total complaints</span>
+                      <span className="font-medium">{stats.total}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Resolved cases</span>
+                      <span className="font-medium text-green-600">{stats.resolved}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Satisfaction rating</span>
+                      <span className="font-medium flex items-center gap-1">
+                        4.8 <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
