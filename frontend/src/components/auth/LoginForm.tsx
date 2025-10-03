@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Mail, Lock, User, AlertCircle, UserCheck, CheckCircle, ArrowRight, Bot, Clock, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, UserCheck, ArrowRight, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google';
 
 export function LoginForm() {
@@ -71,78 +71,52 @@ export function LoginForm() {
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''}>
       <div className="min-h-screen bg-white flex">
         {/* Left Side - Benefits */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 relative overflow-hidden">
+                {/* Left Side - Benefits */}
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 relative overflow-hidden">
           {/* Background Pattern */}
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-20 left-20 w-32 h-32 bg-white rounded-full"></div>
             <div className="absolute bottom-32 right-20 w-24 h-24 bg-blue-300 rounded-full"></div>
-            <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-indigo-300 rounded-full"></div>
+            <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-blue-400 rounded-full"></div>
           </div>
           
           <div className="relative z-10 flex flex-col justify-center px-12 py-20">
             <div className="mb-12">
               <h1 className="text-4xl font-bold text-white mb-4">
-                Welcome back to{' '}
-                <span className="text-blue-300">QuickFix</span>
+                {isLogin ? 'Welcome to' : 'Join'}{' '}
+                <span className="text-[#77BEF0]">QuickFix</span>
               </h1>
               <p className="text-xl text-blue-100">
-                Access your AI-powered complaint management dashboard
+                {isLogin 
+                  ? 'The AI-powered customer service platform that revolutionizes complaint management'
+                  : 'Start your journey with intelligent customer service automation'
+                }
               </p>
             </div>
             
-            <div className="space-y-8">
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">
-                    Real-time Dashboard
-                  </h3>
-                  <p className="text-blue-200">
-                    Monitor complaints, track resolutions, and manage your team from one unified dashboard
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <Bot className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">
-                    AI-Powered Insights
-                  </h3>
-                  <p className="text-blue-200">
-                    Get intelligent categorization, sentiment analysis, and automated suggestions
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">
-                    Instant Notifications
-                  </h3>
-                  <p className="text-blue-200">
-                    Stay updated with real-time alerts and automated status updates
-                  </p>
-                </div>
+            {/* Dynamic Customer Service Image */}
+            <div className="flex justify-center">
+              <div className="relative">
+                <img
+                  src={isLogin ? "/login.png" : "/Signup.webp"}
+                  alt={isLogin ? "QuickFix Customer Service Features" : "QuickFix Support Agent Platform"}
+                  className="w-full max-w-lg h-auto rounded-lg shadow-lg"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-blue-600/20 to-transparent rounded-lg"></div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Right Side - Login Form */}
-        <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-12 lg:px-16 py-12">
+        <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-12 lg:px-16 py-12 relative">
+          {/* Enhanced Back Button */}
           <Link
             to="/"
-            className="absolute top-6 left-6 text-gray-500 hover:text-blue-600 transition-colors duration-200 flex items-center gap-2 font-medium"
+            className="absolute top-6 left-6 text-gray-400 hover:text-blue-600 transition-all duration-200 flex items-center gap-2 font-medium text-lg group"
           >
-            ← Back to Home
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-200" />
+            Back to Home
           </Link>
 
           <div className="max-w-md w-full mx-auto">

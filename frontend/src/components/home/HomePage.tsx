@@ -38,54 +38,69 @@ export function HomePage() {
       {/* Hero Section */}
       <section className="pt-16 pb-24 bg-gradient-to-br from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-              The agentic AI solution for modern{' '}
-              <span className="text-orange-500">customer service</span>
-            </h1>
-            <p className="text-xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed">
-              With QuickFix, AI agents and human agents work as one—resolving every issue, 
-              instantly and intelligently.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-              <Link
-                to="/login"
-                className="bg-orange-500 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-orange-600 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
-              >
-                Try it free
-              </Link>
-              <button className="border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-lg font-semibold text-lg hover:border-orange-500 hover:text-orange-500 transition-all duration-200 flex items-center justify-center gap-2">
-                <Play className="w-5 h-5" />
-                Book a demo
-              </button>
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left side - Text content */}
+            <div className="text-center lg:text-left">
+              <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+                The agentic AI solution for modern{' '}
+                <span className="text-orange-500">customer service</span>
+              </h1>
+              <p className="text-xl text-gray-600 mb-12 leading-relaxed">
+                With QuickFix, AI agents and human agents work as one—resolving every issue, 
+                instantly and intelligently.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-16">
+                <Link
+                  to="/login"
+                  className="bg-orange-500 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-orange-600 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                >
+                  Try it free
+                </Link>
+                <button className="border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-lg font-semibold text-lg hover:border-orange-500 hover:text-orange-500 transition-all duration-200 flex items-center justify-center gap-2">
+                  <Play className="w-5 h-5" />
+                  Book a demo
+                </button>
+              </div>
             </div>
 
-            {/* Trust Bar */}
-            <div className="text-center">
-              <p className="text-sm text-gray-500 mb-6">TRUSTED BY 73,000+ BUSINESSES WORLDWIDE</p>
-              <div className="relative overflow-hidden">
-                <div className="flex animate-scroll gap-8 items-center opacity-60">
-                  {/* First set of logos */}
-                  <img src="https://dam.freshworks.com/m/172addb8908823a/original/bridgestone-logo.webp" alt="Bridgestone" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/6b09343713112137/original/Tata-Digital-Trustbar-logo.webp" alt="Tata Digital" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/678dcfe0f3352df6/original/S-P-GLobal-Trustbar-logo.webp" alt="S&P Global" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/692895b671757fd/original/Klarna-Trustbar-Logo.webp" alt="Klarna" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/686b5fb695a93fdf/original/Forbes-Trustbar-logo.webp" alt="Forbes" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/65934d5b088a71e4/original/Pepsico-Trustbar-logo.webp" alt="PepsiCo" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/716392be1c61bd75/original/Ingram-Trustbar-logo.webp" alt="Ingram Micro" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/770b19ddd352c7cf/original/pearson-Trustbar-logo.webp" alt="Pearson" className="h-8 grayscale flex-shrink-0" />
-                  
-                  {/* Duplicate set for seamless loop */}
-                  <img src="https://dam.freshworks.com/m/172addb8908823a/original/bridgestone-logo.webp" alt="Bridgestone" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/6b09343713112137/original/Tata-Digital-Trustbar-logo.webp" alt="Tata Digital" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/678dcfe0f3352df6/original/S-P-GLobal-Trustbar-logo.webp" alt="S&P Global" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/692895b671757fd/original/Klarna-Trustbar-Logo.webp" alt="Klarna" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/686b5fb695a93fdf/original/Forbes-Trustbar-logo.webp" alt="Forbes" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/65934d5b088a71e4/original/Pepsico-Trustbar-logo.webp" alt="PepsiCo" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/716392be1c61bd75/original/Ingram-Trustbar-logo.webp" alt="Ingram Micro" className="h-8 grayscale flex-shrink-0" />
-                  <img src="https://dam.freshworks.com/m/770b19ddd352c7cf/original/pearson-Trustbar-logo.webp" alt="Pearson" className="h-8 grayscale flex-shrink-0" />
-                </div>
+            {/* Right side - Hero Image */}
+            <div className="lg:order-2">
+              <div className="relative">
+                <img
+                  src="/messaging-and-live-chat-fd.webp"
+                  alt="QuickFix AI-Powered Customer Service Platform"
+                  className="w-full h-auto rounded-2xl shadow-2xl"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent rounded-2xl"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Trust Bar - moved below hero content */}
+          <div className="text-center mt-24">
+            <p className="text-sm text-gray-500 mb-6">TRUSTED BY 73,000+ BUSINESSES WORLDWIDE</p>
+            <div className="relative overflow-hidden">
+              <div className="flex animate-scroll gap-8 items-center opacity-60">
+                {/* First set of logos */}
+                <img src="https://dam.freshworks.com/m/172addb8908823a/original/bridgestone-logo.webp" alt="Bridgestone" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/6b09343713112137/original/Tata-Digital-Trustbar-logo.webp" alt="Tata Digital" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/678dcfe0f3352df6/original/S-P-GLobal-Trustbar-logo.webp" alt="S&P Global" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/692895b671757fd/original/Klarna-Trustbar-Logo.webp" alt="Klarna" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/686b5fb695a93fdf/original/Forbes-Trustbar-logo.webp" alt="Forbes" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/65934d5b088a71e4/original/Pepsico-Trustbar-logo.webp" alt="PepsiCo" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/716392be1c61bd75/original/Ingram-Trustbar-logo.webp" alt="Ingram Micro" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/770b19ddd352c7cf/original/pearson-Trustbar-logo.webp" alt="Pearson" className="h-8 grayscale flex-shrink-0" />
+                
+                {/* Duplicate set for seamless loop */}
+                <img src="https://dam.freshworks.com/m/172addb8908823a/original/bridgestone-logo.webp" alt="Bridgestone" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/6b09343713112137/original/Tata-Digital-Trustbar-logo.webp" alt="Tata Digital" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/678dcfe0f3352df6/original/S-P-GLobal-Trustbar-logo.webp" alt="S&P Global" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/692895b671757fd/original/Klarna-Trustbar-Logo.webp" alt="Klarna" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/686b5fb695a93fdf/original/Forbes-Trustbar-logo.webp" alt="Forbes" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/65934d5b088a71e4/original/Pepsico-Trustbar-logo.webp" alt="PepsiCo" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/716392be1c61bd75/original/Ingram-Trustbar-logo.webp" alt="Ingram Micro" className="h-8 grayscale flex-shrink-0" />
+                <img src="https://dam.freshworks.com/m/770b19ddd352c7cf/original/pearson-Trustbar-logo.webp" alt="Pearson" className="h-8 grayscale flex-shrink-0" />
               </div>
             </div>
           </div>
@@ -136,6 +151,43 @@ export function HomePage() {
               <p className="text-gray-600">
                 Give your human agents AI-powered insights, suggested responses, 
                 and automated workflows to resolve issues faster.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Video Section */}
+      <section className="py-24 bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+              See QuickFix in action
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Watch how our AI-powered complaint management system transforms customer support 
+              and delivers exceptional experiences at scale.
+            </p>
+          </div>
+
+          <div className="max-w-5xl mx-auto">
+            <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden">
+              <div className="aspect-video">
+                <iframe
+                  src="https://www.youtube.com/embed/6xQO5Rjz-v8"
+                  title="QuickFix Demo Video"
+                  className="w-full h-full"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                ></iframe>
+              </div>
+            </div>
+            
+            {/* Video description */}
+            <div className="text-center mt-8">
+              <p className="text-gray-600 text-lg">
+                Discover how QuickFix revolutionizes customer support with intelligent automation
               </p>
             </div>
           </div>
@@ -290,6 +342,82 @@ export function HomePage() {
             </div>
             <div className="bg-gray-100 h-24 rounded-lg flex items-center justify-center">
               <span className="text-gray-500 font-semibold">GetApp</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Resources Section */}
+      <section className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+              Explore insights & resources on AI-powered customer service
+            </h2>
+            <p className="text-xl text-gray-600 max-w-4xl mx-auto">
+              Real-world stories, practical insights, and tools to help you deliver modern, AI-powered customer service.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Resource Card 1 - Customer Service Report */}
+            <div className="group cursor-pointer">
+              <div className="bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl p-8 mb-6 hover:shadow-xl transition-all duration-300">
+                <img
+                  src="/ChatGPT Image Oct 3, 2025, 10_44_18 PM.png"
+                  alt="QuickFix Customer Service Benchmark Report 2025"
+                  className="w-full h-auto rounded-lg"
+                />
+              </div>
+              <div className="space-y-3">
+                <span className="inline-block bg-green-200 text-green-800 text-xs font-semibold px-3 py-1 rounded-full">
+                  Report
+                </span>
+                <h3 className="text-2xl font-bold text-gray-900">2025 Customer Service Report</h3>
+                <p className="text-gray-600">
+                  Evaluate your performance against industry competitors to see how you measure up.
+                </p>
+              </div>
+            </div>
+
+            {/* Resource Card 2 - Forrester TEI Study */}
+            <div className="group cursor-pointer">
+              <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl p-8 mb-6 hover:shadow-xl transition-all duration-300">
+                <img
+                  src="/ChatGPT Image Oct 3, 2025, 11_00_54 PM.png"
+                  alt="The Total Economic Impact of QuickFix"
+                  className="w-full h-auto rounded-lg"
+                />
+              </div>
+              <div className="space-y-3">
+                <span className="inline-block bg-orange-200 text-orange-800 text-xs font-semibold px-3 py-1 rounded-full">
+                  Study
+                </span>
+                <h3 className="text-2xl font-bold text-gray-900">Forrester on the TEI of QuickFix</h3>
+                <p className="text-gray-600">
+                  See the Total Economic Impact™ of ticketing and conversational support in one with QuickFix.
+                </p>
+              </div>
+            </div>
+
+            {/* Resource Card 3 - CX Priorities Report */}
+            <div className="group cursor-pointer">
+              <div className="bg-gradient-to-br from-blue-100 to-cyan-100 rounded-2xl p-8 mb-6 hover:shadow-xl transition-all duration-300">
+                <img
+                  src="/ChatGPT Image Oct 3, 2025, 11_00_54 PM.png"
+                  alt="The Total Economic Impact of QuickFix"
+                  className="w-full h-auto rounded-lg"
+                />
+              </div>
+              <div className="space-y-3">
+                <span className="inline-block bg-orange-200 text-orange-800 text-xs font-semibold px-3 py-1 rounded-full">
+                  Study
+                </span>
+                <h3 className="text-2xl font-bold text-gray-900">The Total Economic Impact of QuickFix</h3>
+                <p className="text-gray-600">
+                  See the Total Economic Impact™ of ticketing and conversational support with QuickFix's comprehensive solution.
+                </p>
+              </div>
             </div>
           </div>
         </div>
