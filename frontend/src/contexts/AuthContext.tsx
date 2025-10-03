@@ -28,6 +28,11 @@ interface AuthContextType {
     role: "user" | "agent" | "admin" | "analytics"
   ) => Promise<boolean>;
   decodeGoogleToken: (token: string) => Promise<{ name: string; email: string } | null>;
+  loginWithFacebook: (code: string, isSignup?: boolean) => Promise<boolean>;
+  facebookSignupWithRole: (
+    code: string,
+    role: "user" | "agent" | "admin" | "analytics"
+  ) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -205,6 +210,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Facebook signup with role
+  const facebookSignupWithRole = async (
+    code: string,
+    role: "user" | "agent" | "admin" | "analytics"
+  ): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/facebook-signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, role }),
+      });
+
+      if (!response.ok) return false;
+      const data = await response.json();
+      const userData: User = {
+        id: data.user.id,
+        firstName: data.user.name.split(" ")[0],
+        lastName: data.user.name.split(" ").slice(1).join(" ") || "",
+        name: data.user.name,
+        email: data.user.email,
+        role: data.user.role,
+      };
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(userData);
+
+      return true;
+    } catch (error) {
+      console.error("Facebook signup error:", error);
+      return false;
+    }
+  };
+
+  // Facebook login
+  const loginWithFacebook = async (code: string, isSignup: boolean = false): Promise<boolean> => {
+    try {
+      const endpoint = isSignup ? "/auth/facebook-signup" : "/auth/facebook";
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+
+      if (!response.ok) return false;
+      const data = await response.json();
+      const userData: User = {
+        id: data.user.id,
+        firstName: data.user.name.split(" ")[0],
+        lastName: data.user.name.split(" ").slice(1).join(" ") || "",
+        name: data.user.name,
+        email: data.user.email,
+        role: data.user.role,
+      };
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(userData);
+
+      return true;
+    } catch (error) {
+      console.error("Facebook login error:", error);
+      return false;
+    }
+  };
+
   // Logout
   const logout = () => {
     localStorage.removeItem("token");
@@ -223,6 +294,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         googleLogin,
         googleSignupWithRole,
         decodeGoogleToken,
+        loginWithFacebook,
+        facebookSignupWithRole,
       }}
     >
       {children}

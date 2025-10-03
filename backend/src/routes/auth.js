@@ -4,7 +4,13 @@ import {
   loginUser, 
   googleLogin, 
   decodeGoogleToken, 
-  googleSignupWithRole 
+  googleSignupWithRole,
+  facebookLogin,
+  facebookSignupWithRole,
+  generateComplaintFromChat,
+  processChatForComplaint,
+  chatWithWatson,
+  generateComplaintFromWatson
 } from "../controllers/authController.js";
 
 const router = express.Router();
@@ -19,5 +25,19 @@ router.post("/google", googleLogin);
 // Google OAuth signup with role selection
 router.post("/google-decode", decodeGoogleToken);
 router.post("/google-signup", googleSignupWithRole);
+
+// Facebook OAuth login
+router.post("/facebook", facebookLogin);
+
+// Facebook OAuth signup with role selection
+router.post("/facebook-signup", facebookSignupWithRole);
+
+// AI-powered complaint generation from chat
+router.post("/generate-complaint-from-chat", generateComplaintFromChat);
+router.post("/process-chat", processChatForComplaint);
+
+// IBM Watson Assistant integration
+router.post("/chat-watson", chatWithWatson);
+router.post("/generate-complaint-watson", generateComplaintFromWatson);
 
 export default router;

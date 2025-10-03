@@ -27,6 +27,11 @@ module.exports = {
   // AI Service configuration
   AI_SERVICE_URL: process.env.AI_SERVICE_URL || 'http://localhost:5001',
   
+  // OAuth configuration
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+  GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+  
   // File upload configuration
   UPLOAD_PATH: process.env.UPLOAD_PATH || './uploads',
   MAX_FILE_SIZE: process.env.MAX_FILE_SIZE || 5 * 1024 * 1024, // 5MB

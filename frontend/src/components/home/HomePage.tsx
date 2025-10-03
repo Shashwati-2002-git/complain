@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Shield, 
   Bot, 
@@ -14,11 +15,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 
-interface HomePageProps {
-  onShowLogin: () => void;
-}
-
-export function HomePage({ onShowLogin }: HomePageProps) {
+export function HomePage() {
   const features = [
     {
       icon: Bot,
@@ -140,20 +137,28 @@ export function HomePage({ onShowLogin }: HomePageProps) {
               <a href="#testimonials" className="text-gray-300 hover:text-orange-400 font-medium transition-colors duration-200">Reviews</a>
               <a href="#testimonials" className="text-gray-300 hover:text-orange-400 font-medium transition-colors duration-200">About us</a>
 
-              <button
-                onClick={onShowLogin}
-                className="bg-orange-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-orange-600 transform hover:scale-105 transition-all duration-200"
-              >
-                Get Started
-              </button>
+              <div className="flex gap-3">
+                <Link
+                  to="/login"
+                  className="text-gray-300 hover:text-orange-400 font-medium transition-colors duration-200 px-4 py-2"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  className="bg-orange-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-orange-600 transform hover:scale-105 transition-all duration-200"
+                >
+                  Sign Up
+                </Link>
+              </div>
             </nav>
 
-            <button
-              onClick={onShowLogin}
-              className="md:hidden bg-orange-500 text-white px-4 py-2 rounded-lg font-semibold"
+            <Link
+              to="/login"
+              className="md:hidden bg-orange-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-orange-600 transition-colors duration-200"
             >
               Login
-            </button>
+            </Link>
           </div>
         </div>
       </header>
@@ -171,20 +176,20 @@ export function HomePage({ onShowLogin }: HomePageProps) {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <button
-                onClick={onShowLogin}
+              <Link
+                to="/signup"
                 className="bg-orange-500 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-orange-600 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
               >
-                File a Complaint
+                Get Started - Sign Up
                 <ArrowRight className="w-5 h-5" />
-              </button>
-              <button
-                onClick={onShowLogin}
+              </Link>
+              <Link
+                to="/login"
                 className="border-2 border-gray-600 text-gray-300 px-8 py-4 rounded-xl font-semibold text-lg hover:border-orange-500 hover:text-orange-400 transition-all duration-200 flex items-center justify-center gap-2"
               >
                 <Users className="w-5 h-5" />
-                Admin Access
-              </button>
+                Login to Account
+              </Link>
             </div>
 
             {/* Demo Accounts Info */}
@@ -313,13 +318,13 @@ export function HomePage({ onShowLogin }: HomePageProps) {
           <p className="text-xl text-orange-100 mb-8 max-w-2xl mx-auto">
             Join thousands of businesses using QuickFix to deliver exceptional customer support with AI
           </p>
-          <button
-            onClick={onShowLogin}
+          <Link
+            to="/signup"
             className="bg-white text-orange-600 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-100 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center gap-2 mx-auto"
           >
             Start Free Trial
             <ArrowRight className="w-5 h-5" />
-          </button>
+          </Link>
         </div>
       </section>
 

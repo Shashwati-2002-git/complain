@@ -11,6 +11,13 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'admin', 'agent', 'analytics'], 
       default: 'user' 
     },
+    // Google OAuth fields
+    isGoogleUser: { type: Boolean, default: false },
+    googleId: { type: String },
+    
+    // Facebook OAuth fields  
+    isFacebookUser: { type: Boolean, default: false },
+    facebookId: { type: String },
   },
   { timestamps: true }
 );

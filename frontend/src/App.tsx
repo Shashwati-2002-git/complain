@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ComplaintProvider } from './contexts/ComplaintContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { SocketProvider } from './contexts/SocketContext';
 import { HomePage } from './components/home/HomePage';
 import { LoginForm } from './components/auth/LoginForm';
+import SignupPage from './components/auth/SignupPage';
+import FacebookCallback from './components/auth/FacebookCallback';
 import { UserDashboard } from './components/dashboard/UserDashboard';
 import { AdminDashboard } from './components/dashboard/AdminDashboard';
 import { AgentDashboard } from './components/dashboard/AgentDashboard';
@@ -14,25 +17,16 @@ import { useAuth } from './contexts/AuthContext';
 import { Notifications } from './components/notifications/Notifications';
 import { useNotificationPermission } from './hooks/useSocket';
 
-function AppContent() {
-  const { user, isAuthenticated } = useAuth();
-  const [showLogin, setShowLogin] = useState(false);
+// Protected Route Component
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
+}
 
-  // Request notification permission
+// Dashboard Route Component
+function DashboardRoute() {
+  const { user } = useAuth();
   useNotificationPermission();
-
-  // Debug logging
-  console.log('AppContent - isAuthenticated:', isAuthenticated);
-  console.log('AppContent - user:', user);
-  console.log('AppContent - user role:', user?.role);
-
-  if (!isAuthenticated && !showLogin) {
-    return <HomePage onShowLogin={() => setShowLogin(true)} />;
-  }
-
-  if (!isAuthenticated) {
-    return <LoginForm onBack={() => setShowLogin(false)} />;
-  }
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -47,13 +41,69 @@ function AppContent() {
   );
 }
 
+function AppContent() {
+  const { isAuthenticated } = useAuth();
+
+  return (
+    <Routes>
+      {/* Public Routes */}
+      <Route 
+        path="/" 
+        element={
+          isAuthenticated ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <HomePage />
+          )
+        } 
+      />
+      <Route 
+        path="/login" 
+        element={
+          isAuthenticated ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <LoginForm />
+          )
+        } 
+      />
+      <Route 
+        path="/signup" 
+        element={
+          isAuthenticated ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <SignupPage />
+          )
+        } 
+      />
+      <Route path="/auth/facebook/callback" element={<FacebookCallback />} />
+      
+      {/* Protected Routes */}
+      <Route 
+        path="/dashboard" 
+        element={
+          <ProtectedRoute>
+            <DashboardRoute />
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* Catch all route */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
 function App() {
   return (
     <AuthProvider>
       <SocketProvider>
         <ComplaintProvider>
           <NotificationProvider>
-            <AppContent />
+            <Router>
+              <AppContent />
+            </Router>
           </NotificationProvider>
         </ComplaintProvider>
       </SocketProvider>
