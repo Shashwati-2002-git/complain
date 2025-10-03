@@ -145,10 +145,10 @@ export function HomePage() {
                   Login
                 </Link>
                 <Link
-                  to="/signup"
+                  to="/login"
                   className="bg-orange-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-orange-600 transform hover:scale-105 transition-all duration-200"
                 >
-                  Sign Up
+                  Get Started
                 </Link>
               </div>
             </nav>
@@ -177,10 +177,10 @@ export function HomePage() {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
               <Link
-                to="/signup"
+                to="/login"
                 className="bg-orange-500 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-orange-600 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
               >
-                Get Started - Sign Up
+                Get Started
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
@@ -319,10 +319,10 @@ export function HomePage() {
             Join thousands of businesses using QuickFix to deliver exceptional customer support with AI
           </p>
           <Link
-            to="/signup"
+            to="/login"
             className="bg-white text-orange-600 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-100 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center gap-2 mx-auto"
           >
-            Start Free Trial
+            Get Started
             <ArrowRight className="w-5 h-5" />
           </Link>
         </div>

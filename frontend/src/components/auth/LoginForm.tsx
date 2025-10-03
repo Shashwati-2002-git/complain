@@ -315,17 +315,6 @@ export function LoginForm() {
                   : 'Already have an account? Sign in'}
               </button>
             </div>
-
-            {isLogin && (
-              <div className="text-center mt-4">
-                <Link
-                  to="/signup"
-                  className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200"
-                >
-                  Need a new account? Try our enhanced signup page →
-                </Link>
-              </div>
-            )}
           </div>
         </div>
       </div>

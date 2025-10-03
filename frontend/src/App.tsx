@@ -6,7 +6,6 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { SocketProvider } from './contexts/SocketContext';
 import { HomePage } from './components/home/HomePage';
 import { LoginForm } from './components/auth/LoginForm';
-import SignupPage from './components/auth/SignupPage';
 import FacebookCallback from './components/auth/FacebookCallback';
 import { UserDashboard } from './components/dashboard/UserDashboard';
 import { AdminDashboard } from './components/dashboard/AdminDashboard';
@@ -67,16 +66,7 @@ function AppContent() {
           )
         } 
       />
-      <Route 
-        path="/signup" 
-        element={
-          isAuthenticated ? (
-            <Navigate to="/dashboard" replace />
-          ) : (
-            <SignupPage />
-          )
-        } 
-      />
+
       <Route path="/auth/facebook/callback" element={<FacebookCallback />} />
       
       {/* Protected Routes */}
