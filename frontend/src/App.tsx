@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { ComplaintProvider } from './contexts/ComplaintContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { SocketProvider } from './contexts/SocketContext';  // ✅ Import the SocketProvider
+
 import { HomePage } from './components/home/HomePage';
 import { LoginForm } from './components/auth/LoginForm';
 import { UserDashboard } from './components/dashboard/UserDashboard';
@@ -42,13 +44,15 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <ComplaintProvider>
-        <NotificationProvider>
-          <AppContent />
-        </NotificationProvider>
-      </ComplaintProvider>
-    </AuthProvider>
+    <SocketProvider>  {/* ✅ Wrap at the top level */}
+      <AuthProvider>
+        <ComplaintProvider>
+          <NotificationProvider>
+            <AppContent />
+          </NotificationProvider>
+        </ComplaintProvider>
+      </AuthProvider>
+    </SocketProvider>
   );
 }
 
