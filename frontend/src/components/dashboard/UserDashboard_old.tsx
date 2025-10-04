@@ -69,6 +69,7 @@ export function UserDashboard({ user }: UserDashboardProps) {
   const [showChatBot, setShowChatBot] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [userProfile, setUserProfile] = useState({
     name: user?.name || 'John Doe',
     email: user?.email || 'john.doe@example.com',
@@ -248,10 +249,10 @@ export function UserDashboard({ user }: UserDashboardProps) {
           </div>
         </header>
 
-        {/* Dashboard View - Core Complaint Features */}
+        {/* Dashboard View - Freshdesk Style with Core Complaint Features */}
         {activeView === 'dashboard' && (
           <div className="p-6 bg-gray-50 min-h-screen">
-            {/* Top Metrics Cards */}
+            {/* Top Metrics Cards - Freshdesk Style */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
               <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">Total Complaints</h3>
@@ -284,7 +285,7 @@ export function UserDashboard({ user }: UserDashboardProps) {
               </div>
             </div>
 
-            {/* Main Content Grid */}
+            {/* Main Content Grid - Core Features */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Recent Complaints */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -400,6 +401,49 @@ export function UserDashboard({ user }: UserDashboardProps) {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Status Tracking Overview */}
+            <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Complaint Status Overview</h3>
+                <p className="text-sm text-gray-600 mt-1">Track the progress of your complaints</p>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="flex items-center gap-3 p-4 border border-blue-200 rounded-lg bg-blue-50">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                    <div>
+                      <p className="font-medium text-blue-900">Pending</p>
+                      <p className="text-sm text-blue-700">Awaiting review</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 border border-yellow-200 rounded-lg bg-yellow-50">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <div>
+                      <p className="font-medium text-yellow-900">In Progress</p>
+                      <p className="text-sm text-yellow-700">Being processed</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 border border-green-200 rounded-lg bg-green-50">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <div>
+                      <p className="font-medium text-green-900">Resolved</p>
+                      <p className="text-sm text-green-700">Successfully completed</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 border border-red-200 rounded-lg bg-red-50">
+                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <div>
+                      <p className="font-medium text-red-900">Rejected</p>
+                      <p className="text-sm text-red-700">Not approved</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
             </div>
 
             {/* Status Tracking Overview */}
@@ -774,7 +818,6 @@ export function UserDashboard({ user }: UserDashboardProps) {
                 <div className="text-center text-gray-500">
                   <Bot className="w-12 h-12 mx-auto mb-4 text-blue-500" />
                   <p>AI Assistant is ready to help!</p>
-                  <p className="text-sm mt-2">Ask me about your complaints or get support.</p>
                 </div>
               </div>
             </div>
