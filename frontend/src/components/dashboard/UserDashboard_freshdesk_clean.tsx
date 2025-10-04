@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { 
-  Plus, Clock, CheckCircle, Bell, User, MessageCircle, 
-  Search, Calendar, X, Shield, Home, 
+  Plus, FileText, Clock, CheckCircle, Bell, User, MessageCircle, 
+  Search, Eye, Calendar, Tag, X, Shield, Home, 
   Inbox, BarChart3, Settings, HelpCircle, Menu, Users,
-  Bot, Crown
+  Brain, Bot, Crown
 } from 'lucide-react';
 import { ComplaintForm } from '../complaints/ComplaintForm';
+import { ComplaintDetails } from '../complaints/ComplaintDetails';
+import { FeedbackForm } from '../complaints/FeedbackForm';
+import { ChatBot } from '../chatbot/ChatBot';
 import { Notifications } from '../notifications/Notifications';
 
 // Mock data for demonstration
@@ -64,10 +67,11 @@ interface UserDashboardProps {
 export function UserDashboard({ user }: UserDashboardProps) {
   const [activeView, setActiveView] = useState('dashboard');
   const [complaints] = useState<Complaint[]>(mockComplaints);
-  const [filteredComplaints] = useState<Complaint[]>(mockComplaints);
+  const [filteredComplaints, setFilteredComplaints] = useState<Complaint[]>(mockComplaints);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
-  const [showChatBot, setShowChatBot] = useState(false);
+  const [showComplaintForm, setShowComplaintForm] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [showChatBot, setShowChatBot] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
   // Calculate statistics
@@ -381,7 +385,13 @@ export function UserDashboard({ user }: UserDashboardProps) {
                 </div>
               </div>
               <div className="p-6">
-                <ComplaintForm />
+                <ComplaintForm 
+                  onSubmit={() => {
+                    setActiveView('dashboard');
+                    // Add logic to handle form submission
+                  }}
+                  onCancel={() => setActiveView('dashboard')}
+                />
               </div>
             </div>
           </div>
@@ -403,17 +413,14 @@ export function UserDashboard({ user }: UserDashboardProps) {
                 </div>
               </div>
               <div className="p-6">
-                {selectedComplaint && (
-                  <div>
-                    <h4 className="font-semibold text-lg mb-2">{selectedComplaint.title}</h4>
-                    <p className="text-gray-600 mb-4">{selectedComplaint.description}</p>
-                    <div className="flex gap-4 text-sm text-gray-500">
-                      <span>Category: {selectedComplaint.category}</span>
-                      <span>Priority: {selectedComplaint.priority}</span>
-                      <span>Status: {selectedComplaint.status}</span>
-                    </div>
-                  </div>
-                )}
+                <ComplaintDetails 
+                  complaint={selectedComplaint}
+                  onClose={() => setSelectedComplaint(null)}
+                  onFeedback={() => {
+                    setSelectedComplaint(null);
+                    setShowFeedbackForm(true);
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -437,11 +444,8 @@ export function UserDashboard({ user }: UserDashboardProps) {
                   </button>
                 </div>
               </div>
-              <div className="h-[500px] p-4">
-                <div className="text-center text-gray-500">
-                  <Bot className="w-12 h-12 mx-auto mb-4 text-blue-500" />
-                  <p>AI Assistant is ready to help!</p>
-                </div>
+              <div className="h-[500px]">
+                <ChatBot onClose={() => setShowChatBot(false)} />
               </div>
             </div>
           </div>
@@ -485,39 +489,10 @@ export function UserDashboard({ user }: UserDashboardProps) {
                 </div>
               </div>
               <div className="p-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Rating</label>
-                    <div className="flex gap-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button key={star} className="text-yellow-400 hover:text-yellow-500">
-                          ⭐
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Comments</label>
-                    <textarea 
-                      className="w-full border border-gray-300 rounded-lg p-3 h-24"
-                      placeholder="Share your feedback..."
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <button 
-                      onClick={() => setShowFeedbackForm(false)}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                    >
-                      Submit
-                    </button>
-                    <button 
-                      onClick={() => setShowFeedbackForm(false)}
-                      className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+                <FeedbackForm 
+                  onSubmit={() => setShowFeedbackForm(false)}
+                  onCancel={() => setShowFeedbackForm(false)}
+                />
               </div>
             </div>
           </div>
