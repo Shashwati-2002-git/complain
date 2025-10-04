@@ -1,104 +1,108 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Plus, Clock, CheckCircle, Bell, User, MessageCircle, 
   Search, Calendar, X, Shield, Home, 
   Inbox, HelpCircle, Menu,
-  Bot, Star, AlertCircle, Eye
+  Bot, Star, AlertCircle, Eye, LogOut, Settings, ChevronDown
 } from 'lucide-react';
 import { ComplaintForm } from '../complaints/ComplaintForm';
 import { Notifications } from '../notifications/Notifications';
+import { useAuth } from '../../contexts/AuthContext';
+import { useComplaints, Complaint } from '../../contexts/ComplaintContext';
 
-// Mock data for demonstration
-const mockComplaints = [
-  {
-    id: '1',
-    title: 'Billing discrepancy in last month invoice',
-    description: 'There seems to be an error in my billing statement for August.',
-    category: 'Billing',
-    priority: 'High',
-    status: 'Open',
-    createdAt: '2024-10-01T10:00:00Z',
-    user: 'john.doe@example.com'
-  },
-  {
-    id: '2', 
-    title: 'Product delivery delayed by 3 days',
-    description: 'My order was supposed to arrive on October 1st but still pending.',
-    category: 'Delivery',
-    priority: 'Medium',
-    status: 'In Progress',
-    createdAt: '2024-09-30T14:30:00Z',
-    user: 'jane.smith@example.com'
-  },
-  {
-    id: '3',
-    title: 'Unable to access customer portal',
-    description: 'Getting authentication errors when trying to log in.',
-    category: 'Technical',
-    priority: 'High',
-    status: 'Resolved',
-    createdAt: '2024-09-29T09:15:00Z',
-    user: 'mike.johnson@example.com'
-  }
-];
-
-interface Complaint {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  priority: string;
-  status: string;
-  createdAt: string;
-  user: string;
-}
-
-interface UserDashboardProps {
-  user?: {
-    name: string;
-    email: string;
-    role: string;
-  };
-}
-
-export function UserDashboard({ user }: UserDashboardProps) {
+export function UserDashboard() {
+  const { user, logout } = useAuth();
+  const { complaints } = useComplaints();
   const [activeView, setActiveView] = useState('dashboard');
-  const [complaints] = useState<Complaint[]>(mockComplaints);
-  const [filteredComplaints] = useState<Complaint[]>(mockComplaints);
+  const [filteredComplaints, setFilteredComplaints] = useState<Complaint[]>([]);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [showChatBot, setShowChatBot] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState({
-    name: user?.name || 'John Doe',
-    email: user?.email || 'john.doe@example.com',
+    name: user?.name || 'User',
+    email: user?.email || 'user@example.com',
     phone: '+1 (555) 123-4567',
     organization: 'ABC Company',
-    role: user?.role || 'Customer',
+    role: user?.role || 'user',
     joinDate: '2024-01-15'
   });
 
-  // Calculate statistics
+  // Update user profile when user changes
+  useEffect(() => {
+    if (user) {
+      setUserProfile({
+        name: user.name,
+        email: user.email,
+        phone: '+1 (555) 123-4567',
+        organization: 'ABC Company',
+        role: user.role,
+        joinDate: '2024-01-15'
+      });
+    }
+  }, [user]);
+
+  // Update filtered complaints when complaints change
+  useEffect(() => {
+    setLoading(true);
+    if (complaints && user) {
+      // Filter complaints to show only current user's complaints
+      const userComplaints = complaints.filter(c => c.userId === user.id);
+      setFilteredComplaints(userComplaints);
+    }
+    setLoading(false);
+  }, [complaints, user]);
+
+  const handleLogout = () => {
+    logout();
+    setShowUserMenu(false);
+  };
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (showUserMenu && !target.closest('.user-menu-container')) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserMenu]);
+
+  // Calculate statistics from real data
   const stats = {
-    total: complaints.length,
-    open: complaints.filter(c => c.status === 'Open').length,
-    inProgress: complaints.filter(c => c.status === 'In Progress').length,
-    resolved: complaints.filter(c => c.status === 'Resolved').length,
-    rejected: complaints.filter(c => c.status === 'Rejected').length,
-    urgent: complaints.filter(c => c.priority === 'High').length,
-    thisWeek: 5,
+    total: filteredComplaints.length,
+    open: filteredComplaints.filter(c => c.status === 'Open').length,
+    inProgress: filteredComplaints.filter(c => c.status === 'In Progress' || c.status === 'Under Review').length,
+    resolved: filteredComplaints.filter(c => c.status === 'Resolved' || c.status === 'Closed').length,
+    escalated: filteredComplaints.filter(c => c.status === 'Escalated').length,
+    urgent: filteredComplaints.filter(c => c.priority === 'High' || c.priority === 'Urgent').length,
+    thisWeek: filteredComplaints.filter(c => {
+      const createdDate = new Date(c.createdAt);
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return createdDate >= weekAgo;
+    }).length,
     avgResponseTime: '2.5h'
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Resolved':
+      case 'Closed':
         return 'bg-green-100 text-green-700 border-green-200';
       case 'In Progress':
+      case 'Under Review':
         return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'Rejected':
+      case 'Escalated':
         return 'bg-red-100 text-red-700 border-red-200';
-      case 'Pending':
+      case 'Open':
         return 'bg-blue-100 text-blue-700 border-blue-200';
       default:
         return 'bg-gray-100 text-gray-700 border-gray-200';
@@ -108,6 +112,7 @@ export function UserDashboard({ user }: UserDashboardProps) {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'High':
+      case 'Urgent':
         return 'text-red-600 bg-red-50';
       case 'Medium':
         return 'text-yellow-600 bg-yellow-50';
@@ -200,7 +205,7 @@ export function UserDashboard({ user }: UserDashboardProps) {
               <Menu className="w-5 h-5 text-gray-600" />
             </button>
             <h1 className="text-xl font-semibold text-gray-900">
-              {activeView === 'dashboard' && 'My Dashboard'}
+              {activeView === 'dashboard' && 'User Dashboard'}
               {activeView === 'complaints' && 'My Complaints'}
               {activeView === 'new-complaint' && 'File New Complaint'}
               {activeView === 'profile' && 'Profile Management'}
@@ -236,14 +241,43 @@ export function UserDashboard({ user }: UserDashboardProps) {
               <HelpCircle className="w-5 h-5" />
             </button>
             
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                {userProfile.name?.charAt(0).toUpperCase() || 'U'}
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-medium text-gray-900">{userProfile.name}</p>
-                <p className="text-xs text-gray-500">{userProfile.role}</p>
-              </div>
+            <div className="relative user-menu-container">
+              <button 
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-3 hover:bg-gray-50 rounded-lg p-2 transition-colors"
+              >
+                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                  {userProfile.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-900">{userProfile.name}</p>
+                  <p className="text-xs text-gray-500">{userProfile.role}</p>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {showUserMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                  <button 
+                    onClick={() => {
+                      setActiveView('profile');
+                      setShowUserMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Profile Settings
+                  </button>
+                  <hr className="my-1" />
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -279,8 +313,14 @@ export function UserDashboard({ user }: UserDashboardProps) {
               
               <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">Urgent</h3>
-                <div className="text-3xl font-bold text-red-600">{stats.urgent}</div>
+                <div className="text-3xl font-bold text-orange-600">{stats.urgent}</div>
                 <p className="text-xs text-gray-500 mt-1">High priority</p>
+              </div>
+              
+              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                <h3 className="text-sm font-medium text-gray-600 mb-2">Escalated</h3>
+                <div className="text-3xl font-bold text-red-600">{stats.escalated}</div>
+                <p className="text-xs text-gray-500 mt-1">Needs review</p>
               </div>
             </div>
 
@@ -298,7 +338,12 @@ export function UserDashboard({ user }: UserDashboardProps) {
                   </button>
                 </div>
                 <div className="p-6">
-                  {filteredComplaints.length === 0 ? (
+                  {loading ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="text-gray-500 mt-2">Loading complaints...</p>
+                    </div>
+                  ) : filteredComplaints.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <Inbox className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                       <p className="text-lg font-medium">No complaints yet</p>
@@ -413,15 +458,15 @@ export function UserDashboard({ user }: UserDashboardProps) {
                   <div className="flex items-center gap-3 p-4 border border-blue-200 rounded-lg bg-blue-50">
                     <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                     <div>
-                      <p className="font-medium text-blue-900">Pending</p>
-                      <p className="text-sm text-blue-700">Awaiting review</p>
+                      <p className="font-medium text-blue-900">Open</p>
+                      <p className="text-sm text-blue-700">New complaints</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-4 border border-yellow-200 rounded-lg bg-yellow-50">
                     <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                     <div>
                       <p className="font-medium text-yellow-900">In Progress</p>
-                      <p className="text-sm text-yellow-700">Being processed</p>
+                      <p className="text-sm text-yellow-700">Under review</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-4 border border-green-200 rounded-lg bg-green-50">
@@ -434,8 +479,8 @@ export function UserDashboard({ user }: UserDashboardProps) {
                   <div className="flex items-center gap-3 p-4 border border-red-200 rounded-lg bg-red-50">
                     <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                     <div>
-                      <p className="font-medium text-red-900">Rejected</p>
-                      <p className="text-sm text-red-700">Not approved</p>
+                      <p className="font-medium text-red-900">Escalated</p>
+                      <p className="text-sm text-red-700">Needs attention</p>
                     </div>
                   </div>
                 </div>
@@ -462,7 +507,12 @@ export function UserDashboard({ user }: UserDashboardProps) {
                 </button>
               </div>
               <div className="p-6">
-                {filteredComplaints.length === 0 ? (
+                {loading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-gray-500 mt-4">Loading your complaints...</p>
+                  </div>
+                ) : filteredComplaints.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <Inbox className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                     <p className="text-xl font-medium mb-2">No complaints found</p>
