@@ -74,7 +74,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     if (!token) return;
 
     // Initialize socket connection
-    const newSocket = io('http://localhost:5000', {
+    const newSocket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001', {
       auth: {
         token: token
       },
