@@ -10,7 +10,8 @@ import {
   generateComplaintFromChat,
   processChatForComplaint,
   chatWithWatson,
-  generateComplaintFromWatson
+  generateComplaintFromWatson,
+  refreshToken
 } from "../controllers/authController.js";
 
 const router = express.Router();
@@ -18,6 +19,7 @@ const router = express.Router();
 // Normal auth
 router.post("/signup", registerUser);
 router.post("/login", loginUser);
+router.post("/refresh", refreshToken);
 
 // Google OAuth login
 router.post("/google", googleLogin);

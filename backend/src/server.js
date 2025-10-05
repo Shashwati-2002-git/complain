@@ -5,8 +5,10 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import jwt from "jsonwebtoken";
 import connectDB from "./config/db.js";
 import { handleConnection } from "./socket/socketHandlers.js";
+import { User } from "./models/User.js";
 
 // Load environment variables
 dotenv.config();
@@ -51,6 +53,40 @@ const io = new Server(server, {
   transports: ['websocket', 'polling']
 });
 
+// Add authentication middleware
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+      return next(new Error("Authentication failed: Missing token"));
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userId = decoded.id || decoded.userId;
+      if (!userId) {
+        return next(new Error("Authentication failed: Invalid token payload"));
+      }
+      
+      // Look up the user in the database
+      const user = await User.findById(userId).select('-password');
+      if (!user) {
+        return next(new Error("Authentication failed: User not found"));
+      }
+      
+      // Attach user to socket for later use
+      socket.user = user;
+      next();
+    } catch (err) {
+      console.error('Socket authentication error:', err.message);
+      next(new Error("Authentication failed: Invalid token"));
+    }
+  } catch (error) {
+    console.error('Socket middleware error:', error);
+    next(new Error("Server error during authentication"));
+  }
+});
+
 // Setup socket handlers
 handleConnection(io);
 
@@ -58,6 +94,12 @@ handleConnection(io);
 app.set('io', io);
 
 // Middleware
+// Add request logger for debugging
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: false,
@@ -78,8 +120,11 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
     
+    console.log('Request origin:', origin);
+    
     // Allow localhost on any port for development
-    if (origin.match(/^http:\/\/localhost:\d+$/)) {
+    if (origin && origin.match(/^http:\/\/localhost:\d+$/)) {
+      console.log('Allowing localhost origin:', origin);
       return callback(null, true);
     }
     
@@ -94,14 +139,17 @@ app.use(cors({
     ];
     
     if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('Allowing origin from allowedOrigins list:', origin);
       return callback(null, true);
     }
     
+    console.log('Rejecting origin:', origin);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Authorization']
 }));
 
 app.use(morgan("combined"));

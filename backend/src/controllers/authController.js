@@ -10,6 +10,11 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 };
 
+// Generate Refresh Token (longer expiration)
+const generateRefreshToken = (id) => {
+  return jwt.sign({ id, tokenType: 'refresh' }, process.env.JWT_SECRET, { expiresIn: "30d" });
+};
+
 // Simple validation helper
 const validateSignup = (name, email, password) => {
   const errors = [];
@@ -108,15 +113,22 @@ export const loginUser = async (req, res) => {
         role: user.role,
       });
 
+      // Generate both access and refresh tokens
+      const accessToken = generateToken(user._id);
+      const refreshToken = generateRefreshToken(user._id);
+      
       res.json({
         success: true,
         user: {
           id: user._id,
-          name: user.name,
+          name: user.name || `${user.firstName} ${user.lastName}`,
+          firstName: user.firstName,
+          lastName: user.lastName,
           email: user.email,
           role: user.role,
         },
-        token: generateToken(user._id),
+        token: accessToken,
+        refreshToken: refreshToken,
       });
     } else {
       res.status(401).json({ message: "Invalid email or password" });
@@ -1404,5 +1416,92 @@ export const facebookSignupWithRole = async (req, res) => {
       message: "Server error during Facebook signup",
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  }
+};
+
+// Token Refresh Endpoint
+export const refreshToken = async (req, res) => {
+  try {
+    // Get the token from the request
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+    
+    try {
+      // Verify the token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      // Find the user
+      const user = await User.findById(decoded.id).select('-password');
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      // Generate new tokens
+      const newToken = generateToken(user._id);
+      const newRefreshToken = generateRefreshToken(user._id);
+      
+      // Return the new tokens
+      return res.status(200).json({
+        token: newToken,
+        refreshToken: newRefreshToken,
+        user: {
+          id: user._id,
+          name: `${user.firstName} ${user.lastName}`,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role
+        }
+      });
+    } catch (tokenError) {
+      // If token verification fails, try the refresh token
+      const refreshToken = req.body.refreshToken;
+      
+      if (!refreshToken) {
+        return res.status(401).json({ message: 'No refresh token provided' });
+      }
+      
+      try {
+        const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+        
+        // Check if it's actually a refresh token
+        if (!decoded.tokenType || decoded.tokenType !== 'refresh') {
+          return res.status(401).json({ message: 'Invalid refresh token' });
+        }
+        
+        const user = await User.findById(decoded.id).select('-password');
+        
+        if (!user) {
+          return res.status(404).json({ message: 'User not found' });
+        }
+        
+        // Generate new tokens
+        const newToken = generateToken(user._id);
+        const newRefreshToken = generateRefreshToken(user._id);
+        
+        // Return the new tokens
+        return res.status(200).json({
+          token: newToken,
+          refreshToken: newRefreshToken,
+          user: {
+            id: user._id,
+            name: `${user.firstName} ${user.lastName}`,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            role: user.role
+          }
+        });
+      } catch (refreshError) {
+        return res.status(401).json({ message: 'Invalid or expired refresh token' });
+      }
+    }
+  } catch (error) {
+    console.error('Error in token refresh:', error);
+    return res.status(500).json({ message: 'Server error during token refresh' });
   }
 };

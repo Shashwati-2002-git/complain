@@ -13,7 +13,7 @@ import { useSocket } from '../../hooks/useSocket';
 export function AgentDashboard() {
   const { user, logout } = useAuth();
   const { complaints } = useComplaints();
-  const { isConnected, socket, joinComplaintRoom, updateComplaint } = useSocket();
+  const { isConnected, socket, joinComplaintRoom, updateComplaint, sendMessage } = useSocket();
   const [activeView, setActiveView] = useState('my-tickets');
   const [filteredComplaints, setFilteredComplaints] = useState<Complaint[]>([]);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
@@ -22,6 +22,9 @@ export function AgentDashboard() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [messageText, setMessageText] = useState('');
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [selectedComplaintForMessage, setSelectedComplaintForMessage] = useState<Complaint | null>(null);
   const [agentProfile, setAgentProfile] = useState({
     name: user?.name || 'Agent',
     email: user?.email || 'agent@example.com',
@@ -43,6 +46,15 @@ export function AgentDashboard() {
       }));
     }
   }, [user]);
+
+  // Debug socket connection status
+  useEffect(() => {
+    console.log('Socket connection status:', isConnected);
+    console.log('Socket instance:', socket ? 'exists' : 'null');
+    
+    // Monitor connection status but don't try to reconnect here
+    // Let the SocketContext handle reconnection
+  }, [isConnected, socket]);
 
   // Update filtered complaints to show only assigned tickets
   useEffect(() => {
@@ -66,6 +78,28 @@ export function AgentDashboard() {
   const handleLogout = () => {
     logout();
     setShowUserMenu(false);
+  };
+  
+  const handleSendMessage = () => {
+    if (selectedComplaintForMessage && messageText.trim()) {
+      // Join the complaint room if not already joined
+      joinComplaintRoom(selectedComplaintForMessage.id);
+      
+      // Send the message via socket
+      sendMessage(selectedComplaintForMessage.id, messageText);
+      
+      // Clear the input and close the modal
+      setMessageText('');
+      setShowMessageModal(false);
+      
+      // Show success notification
+      alert('Message sent successfully');
+    }
+  };
+  
+  const openMessageModal = (complaint: Complaint) => {
+    setSelectedComplaintForMessage(complaint);
+    setShowMessageModal(true);
   };
 
   // Close user menu when clicking outside
@@ -272,10 +306,29 @@ export function AgentDashboard() {
           </div>
           
           <div className="flex items-center gap-4">
-            {/* Socket Connection Status Indicator */}
-            <div className="flex items-center gap-1.5 text-sm">
+            {/* Socket Connection Status Indicator with debug info */}
+            <div className="flex items-center gap-1.5 text-sm group relative">
               <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
               <span className="text-gray-600">{isConnected ? 'Connected' : 'Disconnected'}</span>
+              
+              {/* Debug tooltip */}
+              <div className="hidden group-hover:block absolute top-full left-0 mt-1 w-64 bg-gray-800 text-white p-2 rounded text-xs z-50">
+                <p>Socket ID: {socket?.id || 'Not connected'}</p>
+                <p>Auth token: {localStorage.getItem('token') ? '✓ Present' : '✗ Missing'}</p>
+                <p>User ID: {user?.id || 'Unknown'}</p>
+                <button 
+                  className="mt-1 bg-blue-500 hover:bg-blue-600 px-2 py-0.5 rounded text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (socket) {
+                      socket.disconnect();
+                      setTimeout(() => socket.connect(), 500);
+                    }
+                  }}
+                >
+                  Reconnect
+                </button>
+              </div>
             </div>
             
             {activeView === 'my-tickets' && (
@@ -594,9 +647,12 @@ export function AgentDashboard() {
                 ) : (
                   <div className="space-y-4">
                     {filteredComplaints.map((complaint) => (
-                      <div key={complaint.id} className="border border-gray-200 rounded-lg p-6 hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => setSelectedComplaint(complaint)}>
+                      <div key={complaint.id} className="border border-gray-200 rounded-lg p-6 hover:bg-gray-50 transition-colors">
                         <div className="flex items-start justify-between">
-                          <div className="flex-1">
+                          <div 
+                            className="flex-1 cursor-pointer" 
+                            onClick={() => setSelectedComplaint(complaint)}
+                          >
                             <div className="flex items-center gap-3 mb-2">
                               <h4 className="font-semibold text-gray-900">{complaint.title}</h4>
                               <span className={`px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(complaint.status)}`}>
@@ -628,6 +684,18 @@ export function AgentDashboard() {
                               className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                             >
                               View Details
+                            </button>
+                          </div>
+                          <div className="ml-4">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openMessageModal(complaint);
+                              }}
+                              className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                              Message
                             </button>
                           </div>
                         </div>
@@ -1078,6 +1146,85 @@ export function AgentDashboard() {
           </div>
         )}
       </div>
+
+      {/* Direct Message Modal */}
+      {showMessageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full m-4">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Send Message to User</h3>
+                <button 
+                  onClick={() => setShowMessageModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                {selectedComplaintForMessage && (
+                  <div className="mb-4">
+                    <p className="font-medium text-gray-700">Complaint: {selectedComplaintForMessage.title}</p>
+                    <p className="text-sm text-gray-500">
+                      ID: {selectedComplaintForMessage.id} • Status: {selectedComplaintForMessage.status}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">
+                    Message
+                  </label>
+                  <textarea
+                    id="message"
+                    rows={4}
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Type your message to the user here..."
+                  />
+                </div>
+                
+                <div className="flex justify-between pt-4">
+                  <div className="text-sm text-gray-500">
+                    {isConnected ? (
+                      <span className="flex items-center gap-1 text-green-600">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        Connected
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-red-600">
+                        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                        Disconnected (Cannot send messages)
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => setShowMessageModal(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={handleSendMessage}
+                      disabled={!isConnected || !messageText.trim()}
+                      className={`px-4 py-2 rounded-lg text-white ${
+                        isConnected && messageText.trim() 
+                          ? 'bg-blue-600 hover:bg-blue-700' 
+                          : 'bg-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      Send Message
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

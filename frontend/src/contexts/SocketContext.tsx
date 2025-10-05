@@ -22,8 +22,8 @@ interface SocketProviderProps {
 }
 
 export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
-  const { user } = useAuth();
-  const { checkTokenExpiration } = useTokenValidation();
+  const { user, logout } = useAuth();
+  const { checkTokenExpiration, refreshToken } = useTokenValidation();
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -118,12 +118,53 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       });
 
       // -------------------- Error Handling --------------------
-      newSocket.on('error', (error: Error) => {
+      newSocket.on('error', (error: { message: string }) => {
         console.error('Socket error:', error);
-        if (error.message === 'Invalid user') {
-          checkTokenExpiration().catch((err) => {
-            console.error('Failed to refresh token after invalid user:', err);
-          });
+        
+        // Handle "New login" message specifically to prevent reconnection loops
+        if (error.message === 'New login detected from another device') {
+          console.log('Duplicate connection detected. This connection will be terminated.');
+          // Don't attempt to reconnect in this case
+          return;
+        }
+        
+        // Handle all authentication-related errors
+        if (error.message === 'Invalid user' || 
+            error.message === 'Authentication failed' || 
+            error.message === 'Token expired' || 
+            error.message === 'Invalid token payload') {
+              
+          // Force disconnect the socket immediately
+          console.log('Authentication error detected. Disconnecting socket...');
+          newSocket.disconnect();
+          
+          // Wait a bit before trying to refresh token to prevent rapid attempts
+          setTimeout(() => {
+            console.log('Attempting token refresh...');
+            
+            // Try direct token refresh instead of checkTokenExpiration
+            refreshToken()
+              .then((isValid: boolean) => {
+                console.log('Token refresh attempt result:', isValid ? 'success' : 'failed');
+                
+                if (isValid) {
+                  console.log('Token refreshed successfully, will reconnect on next lifecycle');
+                  // Let the useEffect handle reconnection rather than doing it here
+                  // This avoids having multiple socket connections
+                } else {
+                  console.warn('Token refresh failed. User needs to log in again.');
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('refreshToken');
+                  logout();
+                }
+              })
+              .catch((err: Error) => {
+                console.error('Failed to refresh token:', err);
+                localStorage.removeItem('token');
+                localStorage.removeItem('refreshToken');
+                logout();
+              });
+          }, 2000);
         }
       });
 
@@ -134,25 +175,100 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         if (freshToken) newSocket.auth = { token: freshToken };
       });
     },
-    [checkTokenExpiration]
+    [checkTokenExpiration, logout, refreshToken]
   );
 
   // -------------------- Socket Connection --------------------
   const connectSocket = useCallback(
     (token: string) => {
-      const newSocket = io(
-        import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001',
-        {
+      console.log('Initializing socket connection with token');
+      
+      // Decode token to verify its structure and extract userId
+      let userId = null;
+      try {
+        const tokenParts = token.split('.');
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(atob(tokenParts[1]));
+          console.log('Token payload:', JSON.stringify(payload));
+          
+          // Extract user ID from token - backend expects 'id' as the key
+          userId = payload.id || payload.userId || payload.sub;
+          
+          // Check for critical fields
+          if (!userId) {
+            console.warn('Warning: Token payload missing user ID field');
+            
+            // Last resort: look for any field that looks like a MongoDB ObjectId
+            for (const key in payload) {
+              if (typeof payload[key] === 'string' && /^[0-9a-fA-F]{24}$/.test(payload[key])) {
+                console.log(`Found potential MongoDB ObjectId in field "${key}": ${payload[key]}`);
+                userId = payload[key];
+                break;
+              }
+            }
+          } else {
+            console.log(`Found user ID in token: ${userId}`);
+          }
+          
+          // Check token expiration
+          if (payload.exp) {
+            const expiresIn = payload.exp * 1000 - Date.now();
+            console.log(`Token expires in: ${Math.round(expiresIn / 1000)} seconds`);
+            
+            if (expiresIn < 0) {
+              console.error('Token is already expired!');
+              return null; // Don't even try to connect with expired token
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to decode token:', e);
+      }
+      
+      // Get user from local storage as fallback for userId
+      const userStr = localStorage.getItem('user');
+      let userObj = null;
+      if (userStr && !userId) {
+        try {
+          userObj = JSON.parse(userStr);
+          userId = userObj?.id;
+          console.log('Using user ID from localStorage:', userId);
+        } catch (e) {
+          console.error('Failed to parse user from localStorage:', e);
+        }
+      }
+      
+      // Use dedicated socket URL from environment variables, or fallback to API URL
+      const socketServerUrl = import.meta.env.VITE_SOCKET_SERVER_URL;
+      const socketPort = import.meta.env.VITE_SOCKET_PORT || '5001';
+      
+      // Make sure we have a valid URL with the correct protocol for Socket.IO
+      let baseURL = socketServerUrl;
+      if (!baseURL) {
+        baseURL = import.meta.env.VITE_API_URL 
+          ? import.meta.env.VITE_API_URL.replace('/api', '') 
+          : `http://localhost:${socketPort}`;
+      }
+      
+      // Ensure the URL starts with http:// or https:// for Socket.IO
+      if (!baseURL.startsWith('http://') && !baseURL.startsWith('https://')) {
+        baseURL = `http://${baseURL}`;
+      }
+      
+      console.log('Socket connecting to:', baseURL);
+      
+      const newSocket = io(baseURL, {
           auth: {
             token,
-            userId: user?.id,
+            userId // Include userId extracted from token or localStorage
           },
           transports: ['websocket', 'polling'],
-          reconnection: true,
-          reconnectionDelay: 1000,
-          reconnectionDelayMax: 5000,
-          reconnectionAttempts: 5,
+          reconnection: false, // Disable auto-reconnection - we'll handle it manually
+          reconnectionDelay: 2000,
+          reconnectionDelayMax: 10000,
+          reconnectionAttempts: 3,
           timeout: 10000,
+          forceNew: true, // Force a new connection each time
         }
       );
 
@@ -160,35 +276,91 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setSocket(newSocket);
       return newSocket;
     },
-    [user, setupSocketListeners]
+    [setupSocketListeners] // Dependencies are now properly included in setupSocketListeners
   );
 
   // -------------------- Manage Lifecycle --------------------
   useEffect(() => {
+    // Track if component is still mounted for async operations
+    let isMounted = true;
+    
     if (!user) {
-      socket?.disconnect();
+      if (socket) {
+        console.log('🛑 User not available, disconnecting socket');
+        socket.disconnect();
+        setSocket(null);
+        setIsConnected(false);
+      }
+      return () => { isMounted = false; };
+    }
+
+    // Prevent multiple socket connections
+    if (socket && socket.connected) {
+      console.log('Socket already connected, not creating a new one');
+      return;
+    }
+    
+    // Close any existing connections before creating new ones
+    if (socket && !socket.connected) {
+      console.log('Cleaning up existing disconnected socket');
+      socket.disconnect();
       setSocket(null);
-      setIsConnected(false);
+    }
+    
+    let socketInstance: Socket | null = null;
+    let connectionAttempts = 0;
+    const MAX_ATTEMPTS = 3;
+    
+    // Use localStorage to track connection attempts between renders
+    const lastAttemptTime = parseInt(localStorage.getItem('socketLastAttemptTime') || '0');
+    const currentTime = Date.now();
+    
+    // If we've tried recently (within 5 seconds), don't try again immediately
+    if (currentTime - lastAttemptTime < 5000) {
+      console.log('Throttling connection attempt - tried too recently');
       return;
     }
 
-    let socketInstance: Socket | null = null;
-
     const initializeSocket = async () => {
+      // Update last attempt time
+      localStorage.setItem('socketLastAttemptTime', currentTime.toString());
+      
+      // Prevent excessive connection attempts
+      if (connectionAttempts >= MAX_ATTEMPTS) {
+        console.error('Max connection attempts reached, giving up');
+        return;
+      }
+      
+      connectionAttempts++;
+      console.log(`Socket connection attempt ${connectionAttempts}/${MAX_ATTEMPTS}`);
+      
       const isValid = await checkTokenExpiration();
-      if (!isValid) return;
+      if (!isValid) {
+        console.error('Token validation failed, not connecting socket');
+        return;
+      }
 
       const token = localStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        console.error('No token available, not connecting socket');
+        return;
+      }
 
-      socketInstance = connectSocket(token);
+      // Wait a moment before connecting to avoid rapid reconnection issues
+      setTimeout(() => {
+        if (isMounted) {
+          socketInstance = connectSocket(token);
+        }
+      }, 1000);
     };
 
     initializeSocket();
 
     return () => {
+      isMounted = false;
       if (socketInstance) {
         console.log('🛑 Disconnecting socket on cleanup');
+        socketInstance.removeAllListeners();
         socketInstance.disconnect();
       }
     };

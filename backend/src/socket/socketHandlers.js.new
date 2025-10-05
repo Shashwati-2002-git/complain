@@ -8,13 +8,7 @@ const connectedUsers = new Map();
 // Track connection attempts to prevent connection floods
 const connectionAttempts = new Map();
 
-// Store io instance for global access within this module
-let ioInstance;
-
 export const handleConnection = (io) => {
-  // Store io instance for use in helper functions
-  ioInstance = io;
-  
   io.on('connection', async (socket) => {
     const clientIp = socket.handshake.address || 'unknown';
     const timestamp = Date.now();
@@ -428,8 +422,8 @@ async function createNotifications(recipients, notificationData) {
         
         // Emit to recipient if online
         const recipientConnection = connectedUsers.get(recipientId.toString());
-        if (recipientConnection && ioInstance) {
-          const socket = ioInstance.sockets.sockets.get(recipientConnection.socketId);
+        if (recipientConnection) {
+          const socket = io.sockets.sockets.get(recipientConnection.socketId);
           if (socket) {
             socket.emit('notification', { notification });
           }
@@ -446,32 +440,18 @@ async function createNotifications(recipients, notificationData) {
 
 // Helper to broadcast online users
 function broadcastOnlineUsers(io) {
-  // Use provided io or fall back to module-level ioInstance
-  const socketIo = io || ioInstance;
-  if (!socketIo) {
-    console.error('No Socket.IO instance available for broadcasting online users');
-    return;
-  }
-  
   const onlineUsers = Array.from(connectedUsers.values()).map(user => ({
     userId: user.userId,
     userName: user.userName,
     role: user.role
   }));
   
-  socketIo.emit('online_users', onlineUsers);
+  io.emit('online_users', onlineUsers);
 }
 
 // Helper to broadcast dashboard updates
 async function broadcastDashboardUpdate(io) {
   try {
-    // Use provided io or fall back to module-level ioInstance
-    const socketIo = io || ioInstance;
-    if (!socketIo) {
-      console.error('No Socket.IO instance available for broadcasting dashboard updates');
-      return;
-    }
-    
     // Get aggregated stats
     const totalComplaints = await Complaint.countDocuments();
     const openComplaints = await Complaint.countDocuments({ status: { $nin: ['closed', 'resolved'] } });
@@ -496,7 +476,7 @@ async function broadcastDashboardUpdate(io) {
     // Broadcast to admin and agent roles
     for (const [userId, conn] of connectedUsers.entries()) {
       if (conn.role === 'admin' || conn.role === 'agent' || conn.role === 'analytics') {
-        const socket = socketIo.sockets.sockets.get(conn.socketId);
+        const socket = io.sockets.sockets.get(conn.socketId);
         if (socket) {
           socket.emit('dashboard_update', dashboardData);
         }
