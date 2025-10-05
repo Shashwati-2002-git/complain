@@ -1,4 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useContext } from 'react';
+import { SocketContext } from '../contexts/SocketContextStore';
+
+// Main hook to use the socket context
+export const useSocket = () => {
+  const context = useContext(SocketContext);
+  if (!context) throw new Error('useSocket must be used within a SocketProvider');
+  return context;
+};
 
 // Custom hook to request notification permission
 export const useNotificationPermission = () => {
