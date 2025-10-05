@@ -1,4 +1,5 @@
-interface AIAnalysis {
+// AIService.ts
+export interface AIAnalysis {
   category: 'Billing' | 'Technical' | 'Service' | 'Product' | 'General';
   sentiment: 'Positive' | 'Neutral' | 'Negative';
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
@@ -21,24 +22,33 @@ class AIService {
 
   // For backend integration, we'll make API calls
   async classifyComplaint(text: string): Promise<AIAnalysis> {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.warn('No token found in localStorage, using local classification');
+      return this.localClassification(text);
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/ai/classify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ text })
       });
 
       if (response.ok) {
         return await response.json();
+      } else {
+        const errorText = await response.text();
+        console.error('AI API classification error:', response.status, errorText);
       }
     } catch (error) {
-      console.warn('API classification failed, using fallback logic');
+      console.warn('API classification failed, using fallback logic', error);
     }
 
-    // Fallback to local classification if API fails
+    // Fallback to local classification
     return this.localClassification(text);
   }
 
@@ -62,11 +72,8 @@ class AIService {
     const negativeScore = this.negativeKeywords.filter(keyword => lowercaseText.includes(keyword)).length;
     const positiveScore = this.positiveKeywords.filter(keyword => lowercaseText.includes(keyword)).length;
 
-    if (negativeScore > positiveScore) {
-      sentiment = 'Negative';
-    } else if (positiveScore > negativeScore) {
-      sentiment = 'Positive';
-    }
+    if (negativeScore > positiveScore) sentiment = 'Negative';
+    else if (positiveScore > negativeScore) sentiment = 'Positive';
 
     // Priority assignment
     let priority: AIAnalysis['priority'] = 'Low';
@@ -80,24 +87,25 @@ class AIService {
       priority = 'Medium';
     }
 
-    // Calculate confidence score
+    // Confidence score
     const confidence = Math.min(0.95, 0.6 + (maxScore * 0.1) + (urgentScore * 0.1) + (Math.abs(negativeScore - positiveScore) * 0.05));
 
-    return {
-      category,
-      sentiment,
-      priority,
-      confidence,
-    };
+    return { category, sentiment, priority, confidence };
   }
 
   async generateResponse(intent: string, text: string): Promise<string> {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.warn('No token found in localStorage, using fallback response');
+      return this.fallbackResponse(text);
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/ai/response`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ intent, text })
       });
@@ -105,12 +113,18 @@ class AIService {
       if (response.ok) {
         const data = await response.json();
         return data.response;
+      } else {
+        const errorText = await response.text();
+        console.error('AI API response error:', response.status, errorText);
       }
     } catch (error) {
-      console.warn('API response generation failed, using fallback');
+      console.warn('API response generation failed, using fallback', error);
     }
 
-    // Fallback responses
+    return this.fallbackResponse(text);
+  }
+
+  private fallbackResponse(text: string): string {
     const responses = {
       greeting: "Hello! I'm here to help you with your complaints. How can I assist you today?",
       file_complaint: "I'd be happy to help you file a complaint. Could you please describe the issue you're experiencing?",
@@ -121,22 +135,12 @@ class AIService {
       escalation: "I understand your frustration. Let me escalate this to our priority queue and assign it to a senior agent.",
     };
 
-    // Simple intent detection
-    if (text.toLowerCase().includes('hello') || text.toLowerCase().includes('hi')) {
-      return responses.greeting;
-    }
-    if (text.toLowerCase().includes('status') || text.toLowerCase().includes('update')) {
-      return responses.check_status;
-    }
-    if (text.toLowerCase().includes('complaint') || text.toLowerCase().includes('issue') || text.toLowerCase().includes('problem')) {
-      return responses.file_complaint;
-    }
-    if (text.toLowerCase().includes('billing') || text.toLowerCase().includes('payment')) {
-      return responses.faq_billing;
-    }
-    if (text.toLowerCase().includes('technical') || text.toLowerCase().includes('error')) {
-      return responses.faq_technical;
-    }
+    const lower = text.toLowerCase();
+    if (lower.includes('hello') || lower.includes('hi')) return responses.greeting;
+    if (lower.includes('status') || lower.includes('update')) return responses.check_status;
+    if (lower.includes('complaint') || lower.includes('issue') || lower.includes('problem')) return responses.file_complaint;
+    if (lower.includes('billing') || lower.includes('payment')) return responses.faq_billing;
+    if (lower.includes('technical') || lower.includes('error')) return responses.faq_technical;
 
     return responses.faq_general;
   }

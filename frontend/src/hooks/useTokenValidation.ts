@@ -69,8 +69,20 @@ export function useTokenValidation() {
    */
   const refreshToken = useCallback(async (): Promise<boolean> => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '/api';
-      console.log('Attempting to refresh token...');
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      console.log('Attempting to refresh token at:', apiUrl);
+
+      // Prevent multiple simultaneous refresh attempts
+      const lastRefreshTime = parseInt(localStorage.getItem('lastTokenRefresh') || '0');
+      const now = Date.now();
+      
+      if (now - lastRefreshTime < 5000) { // 5 seconds
+        console.log('Skipping token refresh - attempted too recently');
+        return false;
+      }
+      
+      // Record this attempt
+      localStorage.setItem('lastTokenRefresh', now.toString());
 
       const response = await fetch(`${apiUrl}/auth/refresh`, {
         method: 'POST',
@@ -127,16 +139,43 @@ export function useTokenValidation() {
    */
   const checkTokenExpiration = useCallback(async (): Promise<boolean> => {
     const token = localStorage.getItem('token');
-    if (!token) return false;
+    if (!token) {
+      console.log('No token found in localStorage');
+      return false;
+    }
 
     try {
       const parts = token.split('.');
-      if (parts.length !== 3) return false;
+      if (parts.length !== 3) {
+        console.error('Invalid token format - does not have three parts');
+        return false;
+      }
 
-      const payload = JSON.parse(atob(parts[1])) as TokenPayload;
+      let payload: TokenPayload;
+      try {
+        payload = JSON.parse(atob(parts[1])) as TokenPayload;
+      } catch (e) {
+        console.error('Failed to decode token payload:', e);
+        return false;
+      }
+      
+      if (!payload.exp) {
+        console.error('Token missing expiration time');
+        return false;
+      }
+
       const expiresIn = payload.exp * 1000 - Date.now();
       const refreshThreshold = 5 * 60 * 1000; // 5 minutes
+      
+      console.log(`Token expires in ${Math.floor(expiresIn / 1000)} seconds`);
 
+      // If token is already expired
+      if (expiresIn <= 0) {
+        console.log('Token already expired, attempting refresh...');
+        return await refreshToken();
+      }
+      
+      // If token is about to expire
       if (expiresIn < refreshThreshold) {
         console.log('Token expiring soon, attempting refresh...');
         return await refreshToken();

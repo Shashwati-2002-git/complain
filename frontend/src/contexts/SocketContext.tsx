@@ -121,11 +121,41 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       newSocket.on('error', (error: { message: string }) => {
         console.error('Socket error:', error);
         
+        // Maintain a counter of errors in localStorage to prevent infinite loops
+        const errorCount = parseInt(localStorage.getItem('socketErrorCount') || '0', 10);
+        const errorTime = parseInt(localStorage.getItem('socketErrorTime') || '0', 10);
+        const now = Date.now();
+        
+        // Reset error count if last error was more than 1 minute ago
+        if (now - errorTime > 60000) {
+          localStorage.setItem('socketErrorCount', '1');
+          localStorage.setItem('socketErrorTime', now.toString());
+        } else {
+          // Increment error count
+          localStorage.setItem('socketErrorCount', (errorCount + 1).toString());
+          localStorage.setItem('socketErrorTime', now.toString());
+          
+          // If too many errors in a short time, back off reconnection attempts
+          if (errorCount > 5) {
+            console.warn(`Too many socket errors (${errorCount}). Backing off for 30 seconds...`);
+            return; // Don't attempt to reconnect immediately
+          }
+        }
+        
         // Handle "New login" message specifically to prevent reconnection loops
         if (error.message === 'New login detected from another device') {
-          console.log('Duplicate connection detected. This connection will be terminated.');
-          // Don't attempt to reconnect in this case
+          console.log('New login detected - this is normal if you have multiple tabs open');
+          // Mark this as a duplicate connection in localStorage to prevent immediate reconnect
+          localStorage.setItem('socketDuplicateDetected', Date.now().toString());
+          // Don't take any action, the server is handling the duplicate login
           return;
+        }
+        
+        // Handle connection failures
+        if (error.message?.includes('failed') || error.message?.includes('refused')) {
+          console.error('Socket connection failure. Will attempt again later.');
+          // Track the failure time to avoid rapid reconnection attempts
+          localStorage.setItem('socketConnectionFailure', Date.now().toString());
         }
         
         // Handle all authentication-related errors
@@ -149,6 +179,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
                 
                 if (isValid) {
                   console.log('Token refreshed successfully, will reconnect on next lifecycle');
+                  // Reset error count since we successfully refreshed
+                  localStorage.setItem('socketErrorCount', '0');
                   // Let the useEffect handle reconnection rather than doing it here
                   // This avoids having multiple socket connections
                 } else {
@@ -239,42 +271,73 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       }
       
       // Use dedicated socket URL from environment variables, or fallback to API URL
-      const socketServerUrl = import.meta.env.VITE_SOCKET_SERVER_URL;
-      const socketPort = import.meta.env.VITE_SOCKET_PORT || '5001';
-      
-      // Make sure we have a valid URL with the correct protocol for Socket.IO
-      let baseURL = socketServerUrl;
-      if (!baseURL) {
-        baseURL = import.meta.env.VITE_API_URL 
-          ? import.meta.env.VITE_API_URL.replace('/api', '') 
-          : `http://localhost:${socketPort}`;
-      }
-      
-      // Ensure the URL starts with http:// or https:// for Socket.IO
-      if (!baseURL.startsWith('http://') && !baseURL.startsWith('https://')) {
-        baseURL = `http://${baseURL}`;
-      }
-      
-      console.log('Socket connecting to:', baseURL);
-      
-      const newSocket = io(baseURL, {
-          auth: {
-            token,
-            userId // Include userId extracted from token or localStorage
-          },
-          transports: ['websocket', 'polling'],
-          reconnection: false, // Disable auto-reconnection - we'll handle it manually
-          reconnectionDelay: 2000,
-          reconnectionDelayMax: 10000,
-          reconnectionAttempts: 3,
-          timeout: 10000,
-          forceNew: true, // Force a new connection each time
+      // CRITICAL: Socket.IO client requires http:// protocol (NOT ws://)
+      try {
+        const socketServerUrl = import.meta.env.VITE_SOCKET_SERVER_URL;
+        const socketPort = import.meta.env.VITE_SOCKET_PORT || '5001';
+        
+        console.log('Initializing socket with config:', {
+          VITE_SOCKET_SERVER_URL: socketServerUrl,
+          VITE_SOCKET_PORT: socketPort,
+          VITE_API_URL: import.meta.env.VITE_API_URL
+        });
+        
+        // Build a stable base URL to avoid undefined segments
+        let baseURL = '';
+        
+        if (socketServerUrl && typeof socketServerUrl === 'string' && socketServerUrl !== 'undefined') {
+          baseURL = socketServerUrl;
+        } else if (import.meta.env.VITE_API_URL && typeof import.meta.env.VITE_API_URL === 'string') {
+          baseURL = import.meta.env.VITE_API_URL.replace('/api', '');
+        } else {
+          baseURL = `http://localhost:${socketPort}`;
         }
-      );
-
-      setupSocketListeners(newSocket);
-      setSocket(newSocket);
-      return newSocket;
+        
+        // Ensure URL has proper http:// or https:// protocol (required for Socket.IO)
+        if (!baseURL.startsWith('http://') && !baseURL.startsWith('https://')) {
+          baseURL = `http://${baseURL}`;
+        }
+        
+        // Final safety check to avoid 'undefined' in URLs
+        if (baseURL.includes('undefined')) {
+          console.error('⚠️ Invalid socket URL contains undefined:', baseURL);
+          baseURL = `http://localhost:${socketPort}`;
+        }
+        
+        console.log('🔌 Socket connecting to:', baseURL);
+      
+      // Verify token one more time before connecting
+      if (!token) {
+        console.error('Cannot connect socket: No authentication token available');
+        return null;
+      }
+        
+      const socketOptions = {
+        auth: {
+          token,
+          userId // Include userId extracted from token or localStorage
+        },
+        transports: ['websocket', 'polling'], // Try WebSocket first, then fall back to polling
+        reconnection: true, // Enable built-in reconnection
+        reconnectionAttempts: 5, // Increased from 3
+        reconnectionDelay: 1000, // Start with a shorter delay
+        reconnectionDelayMax: 10000,
+        timeout: 20000, // Increased from 10000 to allow more time for connection
+        forceNew: true, // Force a new connection each time
+        autoConnect: true, // Connect immediately
+      };
+      
+      console.log('Initializing socket with options:', socketOptions);
+      const socket = io(baseURL, socketOptions);
+      
+      setupSocketListeners(socket);
+      setSocket(socket);
+      return socket;
+      
+      } catch (err) {
+        console.error('Fatal error initializing socket:', err);
+        return null;
+      }
     },
     [setupSocketListeners] // Dependencies are now properly included in setupSocketListeners
   );
@@ -297,7 +360,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     // Prevent multiple socket connections
     if (socket && socket.connected) {
       console.log('Socket already connected, not creating a new one');
-      return;
+      return () => { isMounted = false; };
     }
     
     // Close any existing connections before creating new ones
@@ -315,10 +378,19 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     const lastAttemptTime = parseInt(localStorage.getItem('socketLastAttemptTime') || '0');
     const currentTime = Date.now();
     
+    // Check if we've recently detected a duplicate connection
+    const duplicateDetectedTime = parseInt(localStorage.getItem('socketDuplicateDetected') || '0');
+    const isDuplicateRecent = (currentTime - duplicateDetectedTime) < 10000; // 10 seconds
+    
+    if (isDuplicateRecent) {
+      console.log('Recently detected as duplicate connection. Waiting before reconnecting.');
+      return () => { isMounted = false; };
+    }
+    
     // If we've tried recently (within 5 seconds), don't try again immediately
     if (currentTime - lastAttemptTime < 5000) {
       console.log('Throttling connection attempt - tried too recently');
-      return;
+      return () => { isMounted = false; };
     }
 
     const initializeSocket = async () => {
