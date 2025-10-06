@@ -1,25 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Clock, CheckCircle, Bell, User, MessageCircle, 
   Search, Calendar, X, Shield, Home, 
-  Inbox, HelpCircle, Menu, Download, Filter,
+  Inbox, HelpCircle, Menu, Download,
   Bot, Star, AlertCircle, Eye, LogOut, Settings, ChevronDown
 } from 'lucide-react';
 import { Notifications } from '../notifications/Notifications';
 import { useAuth } from '../../hooks/useAuth';
 import { useComplaints, Complaint } from '../../contexts/ComplaintContext';
 import { useSocket } from '../../hooks/useSocket';
-import { PaginatedList } from '../common/Pagination';
-import { ComplaintFilters } from '../complaints/ComplaintFilters';
-import { useComplaintFilters } from '../../hooks/useComplaintFilters';
 import { 
   getStatusColor,
   getPriorityColor,
   getConnectionStatusColor,
-  getButtonClasses,
   getNavItemClasses,
-  getProgressBarStyle,
-  getMessageSendButtonClasses
+  getMessageSendButtonClasses,
+  getProgressBarStyle
 } from '../../utils/agentDashboardUtils';
 
 export function AgentDashboard() {
@@ -38,16 +34,21 @@ export function AgentDashboard() {
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [selectedComplaintForMessage, setSelectedComplaintForMessage] = useState<Complaint | null>(null);
   
-  // Filter and pagination for tickets
-  const {
-    filters,
-    filteredComplaints: filteredTickets,
-    toggleStatusFilter,
-    togglePriorityFilter,
-    setDateRange,
-    setSearchQuery,
-    clearFilters
-  } = useComplaintFilters(filteredComplaints);
+  // We'll implement filtering directly in the component for now
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Simple filtering based on search query
+  const filteredTickets = useMemo(() => {
+    if (!searchQuery.trim()) return filteredComplaints;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return filteredComplaints.filter(complaint => 
+      complaint.title.toLowerCase().includes(query) ||
+      complaint.description.toLowerCase().includes(query) ||
+      complaint.id.toLowerCase().includes(query) ||
+      (complaint.category && complaint.category.toLowerCase().includes(query))
+    );
+  }, [filteredComplaints, searchQuery]);
   const [agentProfile, setAgentProfile] = useState({
     name: user?.name || 'Agent',
     email: user?.email || 'agent@example.com',
@@ -622,108 +623,110 @@ export function AgentDashboard() {
                 </div>
               </div>
               
-              {/* Ticket Management Section with Filters */}
               <div className="p-6">
-                {/* Filter Component */}
-                <ComplaintFilters
-                  statuses={['Open', 'In Progress', 'Under Review', 'Resolved', 'Closed', 'Escalated']}
-                  priorities={['Low', 'Medium', 'High', 'Urgent']}
-                  selectedStatuses={filters.status}
-                  selectedPriorities={filters.priority}
-                  searchQuery={filters.searchQuery}
-                  onToggleStatus={toggleStatusFilter}
-                  onTogglePriority={togglePriorityFilter}
-                  onSearchChange={setSearchQuery}
-                  onClearFilters={clearFilters}
-                />
-                
-                {/* Paginated List */}
-                <PaginatedList
-                  items={filteredTickets}
-                  itemsPerPage={10}
-                  loadingState={loading}
-                  loadingMessage="Loading your assigned tickets..."
-                  emptyMessage={
-                    <div className="text-center py-8 text-gray-500">
-                      <Inbox className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                      <p className="text-xl font-medium mb-2">No tickets found</p>
-                      <p className="text-sm mb-6">
-                        {filteredComplaints.length === 0
-                          ? "You don't have any tickets assigned to you yet"
-                          : "No tickets match your current filters"}
-                      </p>
-                      {filteredComplaints.length === 0 ? (
-                        <button 
-                          onClick={() => setActiveView('dashboard')}
-                          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
-                        >
-                          Go To Dashboard
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={clearFilters}
-                          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
-                        >
-                          Clear Filters
-                        </button>
-                      )}
+                {/* Simple Search */}
+                <div className="mb-6">
+                  <div className="relative flex-1 max-w-md">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <Search className="w-4 h-4 text-gray-400" />
                     </div>
-                  }
-                  keyExtractor={(complaint) => complaint.id}
-                  renderItem={(complaint) => (
-                    <div className="border border-gray-200 rounded-lg p-6 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div 
-                          className="flex-1 cursor-pointer" 
-                          onClick={() => setSelectedComplaint(complaint)}
-                        >
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-semibold text-gray-900">{complaint.title}</h4>
-                            <span className={`px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(complaint.status)}`}>
-                              {complaint.status}
-                            </span>
+                    <input
+                      type="search"
+                      className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Search complaints..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                {loading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-gray-500 mt-4">Loading your assigned tickets...</p>
+                  </div>
+                ) : filteredTickets.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Inbox className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-xl font-medium mb-2">No tickets found</p>
+                    <p className="text-sm mb-6">
+                      {filteredComplaints.length === 0
+                        ? "You don't have any tickets assigned to you yet"
+                        : "No tickets match your search"}
+                    </p>
+                    {filteredComplaints.length === 0 ? (
+                      <button 
+                        onClick={() => setActiveView('dashboard')}
+                        className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+                      >
+                        Go To Dashboard
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => setSearchQuery('')}
+                        className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+                      >
+                        Clear Search
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredTickets.map((complaint) => (
+                      <div key={complaint.id} className="border border-gray-200 rounded-lg p-6 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div 
+                            className="flex-1 cursor-pointer" 
+                            onClick={() => setSelectedComplaint(complaint)}
+                          >
+                            <div className="flex items-center gap-3 mb-2">
+                              <h4 className="font-semibold text-gray-900">{complaint.title}</h4>
+                              <span className={`px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(complaint.status)}`}>
+                                {complaint.status}
+                              </span>
+                            </div>
+                            <p className="text-gray-600 mb-3 line-clamp-2">{complaint.description}</p>
+                            <div className="flex items-center gap-6 text-sm text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                {new Date(complaint.createdAt).toLocaleDateString()}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <MessageCircle className="w-4 h-4" />
+                                {complaint.category}
+                              </span>
+                              <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(complaint.priority)}`}>
+                                <AlertCircle className="w-3 h-3" />
+                                {complaint.priority} Priority
+                              </span>
+                            </div>
                           </div>
-                          <p className="text-gray-600 mb-3 line-clamp-2">{complaint.description}</p>
-                          <div className="flex items-center gap-6 text-sm text-gray-500">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              {new Date(complaint.createdAt).toLocaleDateString()}
-                            </span>
-                            <span className="flex items-center gap-1">
+                          <div className="flex items-center gap-3 ml-4">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedComplaint(complaint);
+                              }}
+                              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                            >
+                              View Details
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openMessageModal(complaint);
+                              }}
+                              className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            >
                               <MessageCircle className="w-4 h-4" />
-                              {complaint.category}
-                            </span>
-                            <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(complaint.priority)}`}>
-                              <AlertCircle className="w-3 h-3" />
-                              {complaint.priority} Priority
-                            </span>
+                              Message
+                            </button>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3 ml-4">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedComplaint(complaint);
-                            }}
-                            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                          >
-                            View Details
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openMessageModal(complaint);
-                            }}
-                            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                            Message
-                          </button>
                         </div>
                       </div>
-                    </div>
-                  )}
-                />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

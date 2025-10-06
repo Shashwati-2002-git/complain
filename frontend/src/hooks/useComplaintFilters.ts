@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Complaint } from '../../contexts/ComplaintContext';
+import { Complaint } from '../contexts/ComplaintContext';
 
 type FilterOptions = {
   status: string[];
