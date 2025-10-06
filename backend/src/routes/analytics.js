@@ -136,6 +136,115 @@ router.get("/agent-performance", authenticate, authorize('admin', 'analytics'), 
 });
 
 // Get comprehensive dashboard analytics  
+router.get("/dashboard", authenticate, authorize('admin', 'agent', 'analytics'), asyncHandler(async (req, res) => {
+  const { timeRange = '30' } = req.query;
+  const days = parseInt(timeRange);
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  try {
+    // Role-based filtering
+    let matchFilter = { createdAt: { $gte: startDate } };
+    if (req.user.role === 'agent') {
+      matchFilter.assignedTo = req.user._id;
+    }
+
+    // Total complaints
+    const totalComplaints = await Complaint.countDocuments(matchFilter);
+    
+    // Resolved complaints
+    const resolvedComplaints = await Complaint.countDocuments({
+      ...matchFilter,
+      status: 'Resolved'
+    });
+    
+    // Open complaints
+    const openComplaints = await Complaint.countDocuments({
+      ...matchFilter,
+      status: { $in: ['New', 'Open', 'In Progress'] }
+    });
+    
+    // High priority complaints
+    const highPriorityComplaints = await Complaint.countDocuments({
+      ...matchFilter,
+      priority: 'High'
+    });
+    
+    // In progress complaints
+    const inProgressComplaints = await Complaint.countDocuments({
+      ...matchFilter,
+      status: 'In Progress'
+    });
+    
+    // New today
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const newTodayComplaints = await Complaint.countDocuments({
+      ...matchFilter,
+      createdAt: { $gte: todayStart }
+    });
+    
+    // Reopened complaints
+    const reopenedComplaints = await Complaint.countDocuments({
+      ...matchFilter,
+      reopened: true
+    });
+    
+    // Calculate trend
+    const previousPeriodStart = new Date(startDate);
+    previousPeriodStart.setDate(previousPeriodStart.getDate() - days);
+    const previousPeriodComplaints = await Complaint.countDocuments({
+      createdAt: { $gte: previousPeriodStart, $lt: startDate }
+    });
+    
+    let trend = '0%';
+    if (previousPeriodComplaints > 0) {
+      const trendPercentage = ((totalComplaints - previousPeriodComplaints) / previousPeriodComplaints) * 100;
+      trend = `${trendPercentage > 0 ? '+' : ''}${trendPercentage.toFixed(1)}%`;
+    }
+    
+    // Average resolution time
+    const resolvedComplaints2 = await Complaint.find({
+      ...matchFilter,
+      status: 'Resolved',
+      resolvedAt: { $exists: true },
+      createdAt: { $exists: true }
+    });
+    
+    let avgResolutionTime = '0 days';
+    if (resolvedComplaints2.length > 0) {
+      const totalResolutionTimeMs = resolvedComplaints2.reduce((total, complaint) => {
+        const resolutionTimeMs = new Date(complaint.resolvedAt) - new Date(complaint.createdAt);
+        return total + resolutionTimeMs;
+      }, 0);
+      
+      const avgResolutionTimeDays = totalResolutionTimeMs / (resolvedComplaints2.length * 24 * 60 * 60 * 1000);
+      avgResolutionTime = `${avgResolutionTimeDays.toFixed(1)} days`;
+    }
+    
+    // Return the data
+    res.json({
+      totalComplaints,
+      resolvedComplaints,
+      openComplaints,
+      highPriorityComplaints,
+      inProgressComplaints,
+      newTodayComplaints,
+      reopenedComplaints,
+      trend,
+      avgResolutionTime
+    });
+    
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ 
+      message: 'Error fetching dashboard analytics',
+      error: err.message
+    });
+  }
+}));
+
+// Get comprehensive dashboard analytics (detailed version)
 router.get("/dashboard-complete", authenticate, authorize('admin', 'agent', 'analytics'), asyncHandler(async (req, res) => {
   const { timeRange = '30' } = req.query;
   const days = parseInt(timeRange);
@@ -436,6 +545,91 @@ router.post('/export-report', authenticate, authorize('admin', 'analytics'), asy
       message: 'Error generating report',
       error: error.message
     });
+  }
+}));
+
+/**
+ * @route   GET /api/analytics/team-performance
+ * @desc    Get team performance metrics
+ * @access  Private (Admin/Manager)
+ */
+router.get("/team-performance", authenticate, authorize('admin', 'manager', 'analytics'), asyncHandler(async (req, res) => {
+  const { timeRange = '30' } = req.query;
+  const days = parseInt(timeRange);
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  
+  try {
+    // Get all agents
+    const agents = await User.find({ role: 'agent' }).select('_id firstName lastName');
+    
+    // Prepare the result array
+    const performanceData = await Promise.all(agents.map(async (agent) => {
+      // Total resolved complaints
+      const totalResolved = await Complaint.countDocuments({
+        assignedTo: agent._id,
+        status: 'Resolved',
+        resolvedAt: { $exists: true, $gte: startDate }
+      });
+      
+      // Resolved today
+      const resolvedToday = await Complaint.countDocuments({
+        assignedTo: agent._id,
+        status: 'Resolved',
+        resolvedAt: { $exists: true, $gte: todayStart }
+      });
+      
+      // Average resolution time
+      const resolvedComplaints = await Complaint.find({
+        assignedTo: agent._id,
+        status: 'Resolved',
+        resolvedAt: { $exists: true },
+        createdAt: { $exists: true, $gte: startDate }
+      });
+      
+      let avgResolutionTime = '0 days';
+      if (resolvedComplaints.length > 0) {
+        const totalResolutionTimeMs = resolvedComplaints.reduce((total, complaint) => {
+          const resolutionTimeMs = new Date(complaint.resolvedAt) - new Date(complaint.createdAt);
+          return total + resolutionTimeMs;
+        }, 0);
+        
+        const avgResolutionTimeDays = totalResolutionTimeMs / (resolvedComplaints.length * 24 * 60 * 60 * 1000);
+        avgResolutionTime = `${avgResolutionTimeDays.toFixed(1)} days`;
+      }
+      
+      // Satisfaction score
+      const complaintsWithFeedback = await Complaint.find({
+        assignedTo: agent._id,
+        'feedback.rating': { $exists: true },
+        updatedAt: { $gte: startDate }
+      });
+      
+      let satisfactionScore = 0;
+      if (complaintsWithFeedback.length > 0) {
+        const totalScore = complaintsWithFeedback.reduce((total, complaint) => {
+          return total + (complaint.feedback?.rating || 0);
+        }, 0);
+        
+        satisfactionScore = Math.round((totalScore / complaintsWithFeedback.length) * 20); // Convert 1-5 to percentage
+      }
+      
+      return {
+        agentId: agent._id,
+        agentName: `${agent.firstName} ${agent.lastName}`,
+        resolvedToday,
+        totalResolved,
+        avgResolutionTime,
+        satisfactionScore
+      };
+    }));
+    
+    res.json(performanceData);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching team performance", error: err.message });
   }
 }));
 

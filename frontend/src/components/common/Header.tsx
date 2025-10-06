@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Shield, Bell, LogOut, User, Settings } from 'lucide-react';
 

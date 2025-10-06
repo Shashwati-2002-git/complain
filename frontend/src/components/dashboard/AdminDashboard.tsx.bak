@@ -4,44 +4,6 @@ import { useSocket } from '../../hooks/useSocket';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
 
-// Helper function to get background color class based on agent color
-const getAgentBgColorClass = (color: string): string => {
-  switch (color) {
-    case 'blue': return 'bg-blue-500';
-    case 'green': return 'bg-green-500';
-    case 'red': return 'bg-red-500';
-    case 'orange': return 'bg-orange-500';
-    case 'purple': return 'bg-purple-500';
-    case 'pink': return 'bg-pink-500';
-    default: return 'bg-gray-500';
-  }
-};
-
-// Helper function to get status badge classes
-const getStatusBadgeClasses = (status: string): string => {
-  switch (status) {
-    case 'available': return 'bg-green-100 text-green-800';
-    case 'busy': return 'bg-yellow-100 text-yellow-800';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-};
-
-// Helper function to get workload bar color
-const getWorkloadBarColor = (load: number): string => {
-  if (load >= 7) return 'bg-red-500';
-  if (load >= 5) return 'bg-orange-500';
-  if (load >= 3) return 'bg-blue-500';
-  return 'bg-green-500';
-};
-
-// Helper function to get satisfaction color
-const getSatisfactionColor = (score: number): string => {
-  if (score >= 90) return 'bg-green-500';
-  if (score >= 80) return 'bg-blue-500';
-  if (score >= 70) return 'bg-yellow-500';
-  return 'bg-red-500';
-};
-
 // Define interfaces for type safety
 interface Agent {
   id: string;
@@ -742,14 +704,7 @@ export const AdminDashboard = () => {
                     <tr key={agent.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white ${
-                            agent.color === 'blue' ? 'bg-blue-500' : 
-                            agent.color === 'green' ? 'bg-green-500' : 
-                            agent.color === 'red' ? 'bg-red-500' : 
-                            agent.color === 'orange' ? 'bg-orange-500' : 
-                            agent.color === 'purple' ? 'bg-purple-500' : 
-                            agent.color === 'pink' ? 'bg-pink-500' : 'bg-gray-500'
-                          }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white bg-${agent.color}-500`}>
                             {agent.initials}
                           </div>
                           <div className="ml-4">
@@ -830,14 +785,7 @@ export const AdminDashboard = () => {
                     <tr key={agent.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white ${
-                            agent.color === 'blue' ? 'bg-blue-500' : 
-                            agent.color === 'green' ? 'bg-green-500' : 
-                            agent.color === 'red' ? 'bg-red-500' : 
-                            agent.color === 'orange' ? 'bg-orange-500' : 
-                            agent.color === 'purple' ? 'bg-purple-500' : 
-                            agent.color === 'pink' ? 'bg-pink-500' : 'bg-gray-500'
-                          }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white bg-${agent.color}-500`}>
                             {agent.initials}
                           </div>
                           <div className="ml-4">
@@ -902,4 +850,3 @@ export const AdminDashboard = () => {
     </div>
   );
 };
-

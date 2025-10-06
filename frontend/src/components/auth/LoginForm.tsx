@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { Mail, Lock, User, AlertCircle, UserCheck, ArrowRight, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google';
+import validateGoogleConfig from '../../services/googleAuthDebug';
 
 export function LoginForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Debug Google Sign-In configuration on component mount
+  useEffect(() => {
+    validateGoogleConfig();
+  }, []);
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -74,6 +81,8 @@ export function LoginForm() {
     window.location.href = facebookAuthUrl;
   };
 
+  console.log('Google Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
+  
   return (
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''}>
       <div className="min-h-screen bg-white flex">

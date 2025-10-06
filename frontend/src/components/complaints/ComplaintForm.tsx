@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useComplaints } from '../../contexts/ComplaintContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Send, FileText, Sparkles } from 'lucide-react';
 
@@ -29,7 +29,8 @@ export function ComplaintForm({ onSuccess }: ComplaintFormProps) {
         `Your complaint has been classified as ${complaint.category} with ${complaint.priority} priority.`);
       setFormData({ title: '', description: '' });
       onSuccess?.();
-    } catch (error) {
+    } catch {
+      // We're not using the error parameter, so we omit it completely
       addNotification('error', 'Error', 'Failed to file complaint. Please try again.');
     } finally {
       setLoading(false);

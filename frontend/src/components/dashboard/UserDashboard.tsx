@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { ComplaintForm } from '../complaints/ComplaintForm';
 import { Notifications } from '../notifications/Notifications';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useComplaints, Complaint } from '../../contexts/ComplaintContext';
 
 export function UserDashboard() {

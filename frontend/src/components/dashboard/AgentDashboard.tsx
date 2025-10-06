@@ -2,13 +2,25 @@ import { useState, useEffect } from 'react';
 import { 
   Clock, CheckCircle, Bell, User, MessageCircle, 
   Search, Calendar, X, Shield, Home, 
-  Inbox, HelpCircle, Menu, Download,
+  Inbox, HelpCircle, Menu, Download, Filter,
   Bot, Star, AlertCircle, Eye, LogOut, Settings, ChevronDown
 } from 'lucide-react';
 import { Notifications } from '../notifications/Notifications';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useComplaints, Complaint } from '../../contexts/ComplaintContext';
 import { useSocket } from '../../hooks/useSocket';
+import { PaginatedList } from '../common/Pagination';
+import { ComplaintFilters } from '../complaints/ComplaintFilters';
+import { useComplaintFilters } from '../../hooks/useComplaintFilters';
+import { 
+  getStatusColor,
+  getPriorityColor,
+  getConnectionStatusColor,
+  getButtonClasses,
+  getNavItemClasses,
+  getProgressBarStyle,
+  getMessageSendButtonClasses
+} from '../../utils/agentDashboardUtils';
 
 export function AgentDashboard() {
   const { user, logout } = useAuth();
@@ -25,6 +37,17 @@ export function AgentDashboard() {
   const [messageText, setMessageText] = useState('');
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [selectedComplaintForMessage, setSelectedComplaintForMessage] = useState<Complaint | null>(null);
+  
+  // Filter and pagination for tickets
+  const {
+    filters,
+    filteredComplaints: filteredTickets,
+    toggleStatusFilter,
+    togglePriorityFilter,
+    setDateRange,
+    setSearchQuery,
+    clearFilters
+  } = useComplaintFilters(filteredComplaints);
   const [agentProfile, setAgentProfile] = useState({
     name: user?.name || 'Agent',
     email: user?.email || 'agent@example.com',
@@ -185,36 +208,7 @@ export function AgentDashboard() {
     avgResponseTime: '2.5h'
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Resolved':
-      case 'Closed':
-        return 'bg-green-100 text-green-700 border-green-200';
-      case 'In Progress':
-      case 'Under Review':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'Escalated':
-        return 'bg-red-100 text-red-700 border-red-200';
-      case 'Open':
-        return 'bg-blue-100 text-blue-700 border-blue-200';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'High':
-      case 'Urgent':
-        return 'text-red-600 bg-red-50';
-      case 'Medium':
-        return 'text-yellow-600 bg-yellow-50';
-      case 'Low':
-        return 'text-green-600 bg-green-50';
-      default:
-        return 'text-gray-600 bg-gray-50';
-    }
-  };
+  // Using imported helper functions for consistent styling
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -227,9 +221,7 @@ export function AgentDashboard() {
         <div className="space-y-2">
           <button 
             onClick={() => setActiveView('dashboard')}
-            className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-              activeView === 'dashboard' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
-            }`}
+            className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${getNavItemClasses(activeView === 'dashboard')}`}
             title="Dashboard"
           >
             <Home className="w-5 h-5" />
@@ -237,9 +229,7 @@ export function AgentDashboard() {
           
           <button 
             onClick={() => setActiveView('my-tickets')}
-            className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-              activeView === 'my-tickets' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
-            }`}
+            className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${getNavItemClasses(activeView === 'my-tickets')}`}
             title="My Assigned Tickets"
           >
             <Inbox className="w-5 h-5" />
@@ -247,9 +237,7 @@ export function AgentDashboard() {
           
           <button 
             onClick={() => setActiveView('performance')}
-            className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-              activeView === 'performance' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
-            }`}
+            className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${getNavItemClasses(activeView === 'performance')}`}
             title="Performance Metrics"
           >
             <Star className="w-5 h-5" />
@@ -257,9 +245,7 @@ export function AgentDashboard() {
           
           <button 
             onClick={() => setActiveView('profile')}
-            className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-              activeView === 'profile' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
-            }`}
+            className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${getNavItemClasses(activeView === 'profile')}`}
             title="Profile Management"
           >
             <User className="w-5 h-5" />
@@ -308,7 +294,7 @@ export function AgentDashboard() {
           <div className="flex items-center gap-4">
             {/* Socket Connection Status Indicator with debug info */}
             <div className="flex items-center gap-1.5 text-sm group relative">
-              <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <div className={`w-2.5 h-2.5 rounded-full ${getConnectionStatusColor(isConnected)}`}></div>
               <span className="text-gray-600">{isConnected ? 'Connected' : 'Disconnected'}</span>
               
               {/* Debug tooltip */}
@@ -618,91 +604,126 @@ export function AgentDashboard() {
                   <h3 className="text-lg font-semibold text-gray-900">My Assigned Tickets</h3>
                   <p className="text-sm text-gray-600">Manage all tickets assigned to you</p>
                 </div>
-                <button 
-                  onClick={() => setActiveView('performance')}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                >
-                  <Star className="w-4 h-4" />
-                  View Performance
-                </button>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={exportToCSV}
+                    className="border border-gray-300 bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button 
+                    onClick={() => setActiveView('performance')}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                  >
+                    <Star className="w-4 h-4" />
+                    View Performance
+                  </button>
+                </div>
               </div>
+              
+              {/* Ticket Management Section with Filters */}
               <div className="p-6">
-                {loading ? (
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-gray-500 mt-4">Loading your assigned tickets...</p>
-                  </div>
-                ) : filteredComplaints.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Inbox className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-xl font-medium mb-2">No assigned tickets</p>
-                    <p className="text-sm mb-6">You don't have any tickets assigned to you yet</p>
-                    <button 
-                      onClick={() => setActiveView('dashboard')}
-                      className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
-                    >
-                      Go To Dashboard
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredComplaints.map((complaint) => (
-                      <div key={complaint.id} className="border border-gray-200 rounded-lg p-6 hover:bg-gray-50 transition-colors">
-                        <div className="flex items-start justify-between">
-                          <div 
-                            className="flex-1 cursor-pointer" 
-                            onClick={() => setSelectedComplaint(complaint)}
-                          >
-                            <div className="flex items-center gap-3 mb-2">
-                              <h4 className="font-semibold text-gray-900">{complaint.title}</h4>
-                              <span className={`px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(complaint.status)}`}>
-                                {complaint.status}
-                              </span>
-                            </div>
-                            <p className="text-gray-600 mb-3 line-clamp-2">{complaint.description}</p>
-                            <div className="flex items-center gap-6 text-sm text-gray-500">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-4 h-4" />
-                                {new Date(complaint.createdAt).toLocaleDateString()}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <MessageCircle className="w-4 h-4" />
-                                {complaint.category}
-                              </span>
-                              <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(complaint.priority)}`}>
-                                <AlertCircle className="w-3 h-3" />
-                                {complaint.priority} Priority
-                              </span>
-                            </div>
+                {/* Filter Component */}
+                <ComplaintFilters
+                  statuses={['Open', 'In Progress', 'Under Review', 'Resolved', 'Closed', 'Escalated']}
+                  priorities={['Low', 'Medium', 'High', 'Urgent']}
+                  selectedStatuses={filters.status}
+                  selectedPriorities={filters.priority}
+                  searchQuery={filters.searchQuery}
+                  onToggleStatus={toggleStatusFilter}
+                  onTogglePriority={togglePriorityFilter}
+                  onSearchChange={setSearchQuery}
+                  onClearFilters={clearFilters}
+                />
+                
+                {/* Paginated List */}
+                <PaginatedList
+                  items={filteredTickets}
+                  itemsPerPage={10}
+                  loadingState={loading}
+                  loadingMessage="Loading your assigned tickets..."
+                  emptyMessage={
+                    <div className="text-center py-8 text-gray-500">
+                      <Inbox className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                      <p className="text-xl font-medium mb-2">No tickets found</p>
+                      <p className="text-sm mb-6">
+                        {filteredComplaints.length === 0
+                          ? "You don't have any tickets assigned to you yet"
+                          : "No tickets match your current filters"}
+                      </p>
+                      {filteredComplaints.length === 0 ? (
+                        <button 
+                          onClick={() => setActiveView('dashboard')}
+                          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+                        >
+                          Go To Dashboard
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={clearFilters}
+                          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                    </div>
+                  }
+                  keyExtractor={(complaint) => complaint.id}
+                  renderItem={(complaint) => (
+                    <div className="border border-gray-200 rounded-lg p-6 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-start justify-between">
+                        <div 
+                          className="flex-1 cursor-pointer" 
+                          onClick={() => setSelectedComplaint(complaint)}
+                        >
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-semibold text-gray-900">{complaint.title}</h4>
+                            <span className={`px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(complaint.status)}`}>
+                              {complaint.status}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedComplaint(complaint);
-                              }}
-                              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                            >
-                              View Details
-                            </button>
-                          </div>
-                          <div className="ml-4">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openMessageModal(complaint);
-                              }}
-                              className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
-                            >
+                          <p className="text-gray-600 mb-3 line-clamp-2">{complaint.description}</p>
+                          <div className="flex items-center gap-6 text-sm text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {new Date(complaint.createdAt).toLocaleDateString()}
+                            </span>
+                            <span className="flex items-center gap-1">
                               <MessageCircle className="w-4 h-4" />
-                              Message
-                            </button>
+                              {complaint.category}
+                            </span>
+                            <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(complaint.priority)}`}>
+                              <AlertCircle className="w-3 h-3" />
+                              {complaint.priority} Priority
+                            </span>
                           </div>
                         </div>
+                        <div className="flex items-center gap-3 ml-4">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedComplaint(complaint);
+                            }}
+                            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                          >
+                            View Details
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openMessageModal(complaint);
+                            }}
+                            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            Message
+                          </button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  )}
+                />
               </div>
             </div>
           </div>
@@ -752,7 +773,7 @@ export function AgentDashboard() {
                       <span className="text-sm font-bold text-green-600">12</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-green-600 h-2 rounded-full" style={{ width: '75%' }}></div>
+                      <div className="bg-green-600 h-2 rounded-full" style={getProgressBarStyle(75)}></div>
                     </div>
                   </div>
                   
@@ -762,7 +783,7 @@ export function AgentDashboard() {
                       <span className="text-sm font-bold text-blue-600">3.2 hours</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '60%' }}></div>
+                      <div className="bg-blue-600 h-2 rounded-full" style={getProgressBarStyle(60)}></div>
                     </div>
                   </div>
                   
@@ -772,7 +793,7 @@ export function AgentDashboard() {
                       <span className="text-sm font-bold text-purple-600">72%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-purple-600 h-2 rounded-full" style={{ width: '72%' }}></div>
+                      <div className="bg-purple-600 h-2 rounded-full" style={getProgressBarStyle(72)}></div>
                     </div>
                   </div>
                 </div>
@@ -1210,11 +1231,7 @@ export function AgentDashboard() {
                     <button 
                       onClick={handleSendMessage}
                       disabled={!isConnected || !messageText.trim()}
-                      className={`px-4 py-2 rounded-lg text-white ${
-                        isConnected && messageText.trim() 
-                          ? 'bg-blue-600 hover:bg-blue-700' 
-                          : 'bg-gray-400 cursor-not-allowed'
-                      }`}
+                      className={`px-4 py-2 rounded-lg ${getMessageSendButtonClasses(isConnected && Boolean(messageText.trim()))}`}
                     >
                       Send Message
                     </button>

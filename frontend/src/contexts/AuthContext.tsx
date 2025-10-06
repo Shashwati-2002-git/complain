@@ -1,62 +1,113 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
-
-// User interface
-interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  name: string;
-  email: string;
-  role: "user" | "agent" | "admin" | "analytics";
-}
-
-// Auth context interface
-interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
-  register: (
-    name: string,
-    email: string,
-    password: string,
-    role?: "user" | "agent" | "admin" | "analytics"
-  ) => Promise<boolean>;
-  googleLogin: (token: string) => Promise<boolean>;
-  googleSignupWithRole: (
-    token: string,
-    role: "user" | "agent" | "admin" | "analytics"
-  ) => Promise<boolean>;
-  decodeGoogleToken: (token: string) => Promise<{ name: string; email: string } | null>;
-  loginWithFacebook: (code: string, isSignup?: boolean) => Promise<boolean>;
-  facebookSignupWithRole: (
-    code: string,
-    role: "user" | "agent" | "admin" | "analytics"
-  ) => Promise<boolean>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { useState, ReactNode, useEffect, useCallback } from "react";
+import tokenService from "../services/tokenService";
+import { AuthContext, User } from "./AuthContextTypes";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [serverSessionId, setServerSessionId] = useState<string | null>(null);
 
-  // Load user from localStorage
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const savedUser = localStorage.getItem("user");
-    if (token && savedUser) {
-      try {
-        const userData = JSON.parse(savedUser);
-        setUser(userData);
-      } catch (error) {
-        console.error("Error parsing saved user data:", error);
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+  // Validate session with the backend to check if token is valid and server is the same
+  const validateSession = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = localStorage.getItem("token");
+      
+      // No token means no session
+      if (!token) {
+        console.log("No token found, session invalid");
+        return false;
       }
+      
+      // Check token validity
+      if (!tokenService.validateToken(token)) {
+        console.log("Token invalid or expired");
+        tokenService.clearAuthData();
+        setUser(null);
+        return false;
+      }
+
+      // Validate with the server
+      const response = await fetch(`${API_BASE_URL}/auth/validate-session`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.log("Session validation failed with status:", response.status);
+        tokenService.clearAuthData();
+        setUser(null);
+        return false;
+      }
+
+      const data = await response.json();
+      
+      // Check if server has restarted by comparing session IDs
+      if (serverSessionId && data.sessionId !== serverSessionId) {
+        console.log("Server has restarted, forcing re-login");
+        tokenService.clearAuthData();
+        setUser(null);
+        return false;
+      }
+      
+      // Store the server session ID for future comparisons
+      setServerSessionId(data.sessionId);
+      tokenService.setServerSessionId(data.sessionId);
+      
+      return true;
+    } catch (error) {
+      console.error("Session validation error:", error);
+      return false;
     }
-  }, []);
+  }, [serverSessionId]);
+
+  // Load user from localStorage and validate session
+  useEffect(() => {
+    const initializeAuth = async () => {
+      setIsLoading(true);
+      const token = localStorage.getItem("token");
+      const savedUser = localStorage.getItem("user");
+      
+      if (token && savedUser) {
+        try {
+          // Basic token validation before making API call
+          if (!tokenService.validateToken(token)) {
+            console.log("Token validation failed on load");
+            tokenService.clearAuthData();
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+          
+          const userData = JSON.parse(savedUser);
+          setUser(userData);
+          
+          // Validate session with backend
+          await validateSession();
+        } catch (error) {
+          console.error("Error during auth initialization:", error);
+          tokenService.clearAuthData();
+          setUser(null);
+        }
+      }
+      
+      setIsLoading(false);
+    };
+    
+    initializeAuth();
+    
+    // Set up periodic validation check (every 5 minutes)
+    const intervalId = setInterval(() => {
+      validateSession();
+    }, 5 * 60 * 1000); // Check every 5 minutes
+    
+    // Clean up interval on unmount
+    return () => clearInterval(intervalId);
+  }, [validateSession]);
 
   const isAuthenticated = !!user;
 
@@ -295,6 +346,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isAuthenticated,
+        isLoading,
         login,
         logout,
         register,
@@ -303,6 +355,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         decodeGoogleToken,
         loginWithFacebook,
         facebookSignupWithRole,
+        validateSession,
       }}
     >
       {children}
@@ -310,9 +363,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Custom hook
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within an AuthProvider");
-  return context;
-}
+

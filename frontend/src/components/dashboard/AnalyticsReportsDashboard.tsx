@@ -6,7 +6,7 @@ import {
   ChevronDown, LogOut
 } from 'lucide-react';
 import { useComplaints } from '../../contexts/ComplaintContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { Notifications } from '../notifications/Notifications';
 
 export function AnalyticsReportsDashboard() {

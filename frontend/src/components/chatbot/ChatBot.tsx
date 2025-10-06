@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, Settings } from 'lucide-react';
 import { aiService } from '../../services/aiService';
 import { useComplaints } from '../../contexts/ComplaintContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../contexts/NotificationContext';
 
 interface EntityType {

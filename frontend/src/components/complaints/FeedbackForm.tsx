@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Star, Send } from 'lucide-react';
 import { useComplaints } from '../../contexts/ComplaintContext';
 import { useNotifications } from '../../contexts/NotificationContext';
