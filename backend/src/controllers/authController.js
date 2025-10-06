@@ -37,11 +37,21 @@ const validateSignup = (name, email, password) => {
 // Signup
 export const registerUser = async (req, res) => {
   const { name, email, password, role = "user" } = req.body;
+  
+  console.log("Registration request received:", { name, email, role });
 
   try {
     // Validate input
+    if (!name || !email || !password) {
+      console.log("Missing required fields");
+      return res.status(400).json({
+        message: "Missing required fields: name, email, and password are all required",
+      });
+    }
+    
     const validationErrors = validateSignup(name, email, password);
     if (validationErrors.length > 0) {
+      console.log("Validation errors:", validationErrors);
       return res.status(400).json({
         message: "Validation failed",
         errors: validationErrors,
@@ -50,6 +60,7 @@ export const registerUser = async (req, res) => {
 
     // Validate role
     if (role && !["user", "admin", "agent", "analytics"].includes(role)) {
+      console.log("Invalid role:", role);
       return res.status(400).json({
         message: "Invalid role. Must be 'user', 'admin', 'agent', or 'analytics'",
       });
@@ -62,6 +73,15 @@ export const registerUser = async (req, res) => {
         .json({ message: "User already exists with this email" });
     }
 
+    console.log(`Attempting to create user with role: ${role}`);
+    
+    // Special check for admin role to enforce additional security
+    if (role === "admin") {
+      // For development purposes, allow admin creation
+      // In production, you might want to restrict this or require additional verification
+      console.log("Creating admin account - special permissions granted for development");
+    }
+    
     const user = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),

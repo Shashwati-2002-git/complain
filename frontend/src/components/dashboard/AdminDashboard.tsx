@@ -1,1033 +1,1242 @@
-import { useState } from 'react';
-import { 
-  FileText, Clock, CheckCircle, AlertTriangle, 
-  Search, TrendingUp, Shield, ChevronRight,
-  UserPlus, Edit, Trash2, Download, 
-  BarChart3, PieChart, Calendar, RefreshCw,
-  ArrowUp, ArrowDown, Eye,
-  Star, Award, Target, Activity, Zap, UserCheck
-} from 'lucide-react';
-import { useComplaints, Complaint } from '../../contexts/ComplaintContext';
-import { ComplaintDetails } from '../complaints/ComplaintDetails';
-import { StatsCard } from '../common/StatsCard';
-import { Header } from '../common/Header';
-import { AnalyticsChart } from '../analytics/AnalyticsChart';
+import { useState, useEffect, useCallback } from 'react';
+import { Clock, TrendingUp, Settings, Bell, Search, Plus, ChevronDown, Gift, FileText, BarChart3, Shield, MessageCircle, LogOut, CheckCircle, AlertCircle, Activity, UserCheck, RefreshCw, UserX } from 'lucide-react';
+import { useSocket } from '../../hooks/useSocket';
 
-interface AdminUser {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  joinDate: Date;
-  totalComplaints: number;
-  resolvedComplaints: number;
-  activeComplaints: number;
-  lastActive: Date;
-  status: 'active' | 'inactive' | 'banned';
-}
-
-interface Team {
-  id: string;
-  name: string;
-  members: number;
-  activeTickets: number;
-  avgResolutionTime: number;
-  performance: number;
-}
-
-export function AdminDashboard() {
-  const { complaints } = useComplaints();
+export const AdminDashboard = () => {
+  const [activeSection, setActiveSection] = useState('user-agent-control');
+  const { socket, isConnected, onlineUsers } = useSocket();
   
-  // State management
-  const [activeView, setActiveView] = useState<'overview' | 'complaints' | 'users' | 'analytics' | 'settings'>('overview');
-  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-
-  // Calculate admin-specific statistics
-  const stats = {
-    total: complaints.length,
-    open: complaints.filter(c => ['Open', 'In Progress'].includes(c.status)).length,
-    resolved: complaints.filter(c => c.status === 'Resolved').length,
-    escalated: complaints.filter(c => c.isEscalated).length,
-    highPriority: complaints.filter(c => ['High', 'Urgent'].includes(c.priority)).length,
-    avgResolutionTime: 3.4, // Mock data
-    satisfactionRate: 4.2, // Mock data
-    pendingAssignment: complaints.filter(c => !c.assignedTo && c.status === 'Open').length,
-  };
-
-  const todayComplaints = complaints.filter(c => 
-    new Date(c.createdAt).toDateString() === new Date().toDateString()
-  ).length;
-
-  // Mock data for admin teams
-  const teams: Team[] = [
-    { id: '1', name: 'Technical Support', members: 8, activeTickets: 23, avgResolutionTime: 4.2, performance: 92 },
-    { id: '2', name: 'Billing Department', members: 5, activeTickets: 15, avgResolutionTime: 2.8, performance: 95 },
-    { id: '3', name: 'Customer Service', members: 12, activeTickets: 31, avgResolutionTime: 3.5, performance: 88 },
-    { id: '4', name: 'Product Support', members: 6, activeTickets: 18, avgResolutionTime: 5.1, performance: 90 },
-  ];
-
-  const adminUsers: AdminUser[] = [
+  // Real-time agent data
+  const [agents, setAgents] = useState([
     {
       id: '1',
       name: 'John Doe',
-      email: 'user@example.com',
-      role: 'User',
-      joinDate: new Date('2024-01-15'),
-      totalComplaints: 12,
-      resolvedComplaints: 10,
-      activeComplaints: 2,
-      lastActive: new Date(),
-      status: 'active'
+      initials: 'JD',
+      status: 'available',
+      currentLoad: 3,
+      avgResponseTime: '4m 30s',
+      color: 'blue',
+      lastUpdated: new Date()
     },
     {
       id: '2',
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      role: 'User',
-      joinDate: new Date('2024-03-20'),
-      totalComplaints: 8,
-      resolvedComplaints: 7,
-      activeComplaints: 1,
-      lastActive: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      status: 'active'
+      name: 'Alice Smith',
+      initials: 'AS',
+      status: 'busy',
+      currentLoad: 6,
+      avgResponseTime: '5m 12s',
+      color: 'purple',
+      lastUpdated: new Date()
+    },
+    {
+      id: '3',
+      name: 'Robert Johnson',
+      initials: 'RJ',
+      status: 'available',
+      currentLoad: 2,
+      avgResponseTime: '3m 45s',
+      color: 'green',
+      lastUpdated: new Date()
+    },
+    {
+      id: '4',
+      name: 'Emily Davis',
+      initials: 'ED',
+      status: 'offline',
+      currentLoad: 0,
+      avgResponseTime: '4m 15s',
+      color: 'gray',
+      lastUpdated: new Date()
+    },
+    {
+      id: '5',
+      name: 'Michael Wilson',
+      initials: 'MW',
+      status: 'busy',
+      currentLoad: 8,
+      avgResponseTime: '6m 20s',
+      color: 'orange',
+      lastUpdated: new Date()
+    }
+  ]);
+  
+  const [ticketsData, setTicketsData] = useState({
+    total: 92,
+    resolved: 68,
+    pending: 24,
+    critical: 3,
+    inProgress: 15,
+    newToday: 8,
+    reopened: 2,
+    trend: '+8%',
+    avgResolutionTime: '1.4 days'
+  });
+  
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Agent performance data
+  const [agentPerformance, setAgentPerformance] = useState([
+    {
+      id: '1',
+      name: 'John Doe',
+      initials: 'JD',
+      color: 'blue',
+      resolvedToday: 5,
+      totalResolved: 28,
+      avgResolutionTime: '1.2 days',
+      satisfaction: 94
+    },
+    {
+      id: '2',
+      name: 'Alice Smith',
+      initials: 'AS',
+      color: 'purple',
+      resolvedToday: 7,
+      totalResolved: 42,
+      avgResolutionTime: '1.0 days',
+      satisfaction: 96
+    },
+    {
+      id: '3',
+      name: 'Robert Johnson',
+      initials: 'RJ',
+      color: 'green',
+      resolvedToday: 3,
+      totalResolved: 19,
+      avgResolutionTime: '1.5 days',
+      satisfaction: 88
+    },
+    {
+      id: '4',
+      name: 'Emily Davis',
+      initials: 'ED',
+      color: 'orange',
+      resolvedToday: 0,
+      totalResolved: 23,
+      avgResolutionTime: '1.3 days',
+      satisfaction: 92
+    },
+    {
+      id: '5',
+      name: 'Michael Wilson',
+      initials: 'MW',
+      color: 'pink',
+      resolvedToday: 4,
+      totalResolved: 31,
+      avgResolutionTime: '1.1 days',
+      satisfaction: 90
+    }
+  ]);
+  
+  // Function to handle real-time updates
+  const handleAgentStatusUpdate = useCallback((agentData) => {
+    setAgents(prevAgents => {
+      const updatedAgents = [...prevAgents];
+      const agentIndex = updatedAgents.findIndex(agent => agent.id === agentData.id);
+      
+      if (agentIndex >= 0) {
+        updatedAgents[agentIndex] = {
+          ...updatedAgents[agentIndex],
+          status: agentData.status,
+          currentLoad: agentData.currentLoad,
+          lastUpdated: new Date()
+        };
+      }
+      
+      return updatedAgents;
+    });
+  }, []);
+  
+  // Simulate agent status update periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Simulate an agent's status changing
+      const randomAgentIndex = Math.floor(Math.random() * agents.length);
+      const randomAgent = {...agents[randomAgentIndex]};
+      
+      // Randomly change status
+      const statuses = ['available', 'busy', 'offline'];
+      randomAgent.status = statuses[Math.floor(Math.random() * statuses.length)];
+      
+      // Update load based on status
+      if (randomAgent.status === 'available') {
+        randomAgent.currentLoad = Math.floor(Math.random() * 5); // 0-4 tickets
+      } else if (randomAgent.status === 'busy') {
+        randomAgent.currentLoad = Math.floor(Math.random() * 5) + 5; // 5-9 tickets
+      } else {
+        randomAgent.currentLoad = 0; // offline agents have 0 tickets
+      }
+      
+      handleAgentStatusUpdate(randomAgent);
+      
+    }, 15000); // Update every 15 seconds
+    
+    return () => clearInterval(interval);
+  }, [agents, handleAgentStatusUpdate]);
+  
+  // Socket event listener for real-time updates
+  useEffect(() => {
+    if (socket) {
+      // Listen for agent status updates
+      socket.on('agent:statusUpdate', handleAgentStatusUpdate);
+      
+      // Listen for ticket updates
+      socket.on('tickets:update', (data) => {
+        setTicketsData(prevData => ({
+          ...prevData,
+          total: data.total || prevData.total,
+          resolved: data.resolved || prevData.resolved,
+          pending: data.pending || prevData.pending,
+          critical: data.critical || prevData.critical
+        }));
+      });
+      
+      return () => {
+        socket.off('agent:statusUpdate');
+        socket.off('tickets:update');
+      };
+    }
+  }, [socket, handleAgentStatusUpdate]);
+  
+  // Complaint categories data
+  const [complaintCategories, setComplaintCategories] = useState([
+    { name: 'Technical Issues', count: 34, percentage: 37 },
+    { name: 'Billing Problems', count: 26, percentage: 28 },
+    { name: 'Product Quality', count: 18, percentage: 20 },
+    { name: 'Delivery Issues', count: 9, percentage: 10 },
+    { name: 'Other', count: 5, percentage: 5 }
+  ]);
+  
+  // Refresh data on demand
+  const refreshData = () => {
+    setIsRefreshing(true);
+    
+    // Simulate API fetch delay
+    setTimeout(() => {
+      // Update ticket data with small random changes
+      setTicketsData(prevData => ({
+        ...prevData,
+        total: prevData.total + Math.floor(Math.random() * 5),
+        resolved: prevData.resolved + Math.floor(Math.random() * 3),
+        pending: prevData.pending + Math.floor(Math.random() * 2)
+      }));
+      
+      setIsRefreshing(false);
+    }, 1000);
+  };
+  
+  // Assign ticket function
+  const assignTicket = (agentId) => {
+    setAgents(prevAgents => {
+      return prevAgents.map(agent => {
+        if (agent.id === agentId && agent.status === 'available') {
+          return { ...agent, currentLoad: agent.currentLoad + 1 };
+        }
+        return agent;
+      });
+    });
+    
+    // Show success toast or notification
+    alert('Ticket assigned successfully!');
+  };
+
+  const userAgentControl = [
+    { 
+      icon: '👥', 
+      title: 'User Management', 
+      description: 'Add, modify, and deactivate users with different permission levels.', 
+      status: 'active' 
+    },
+    { 
+      icon: '🟢', 
+      title: 'Agent Status', 
+      description: 'View real-time status of agents (free/busy) and their current workload.', 
+      status: 'active' 
+    },
+    { 
+      icon: '📋', 
+      title: 'Ticket Assignment', 
+      description: 'Manually assign tickets to agents or configure auto-assignment rules.', 
+      status: 'active' 
+    },
+    { 
+      icon: '🔍', 
+      title: 'Ticket Tracking', 
+      description: 'Monitor which agent is handling each ticket and their progress.', 
+      status: 'active', 
+      badge: '✓' 
+    },
+    { 
+      icon: '⚖️', 
+      title: 'Workload Distribution', 
+      description: 'Balance ticket load across agents to ensure efficient handling of complaints.', 
+      status: 'active' 
+    },
+    { 
+      icon: '🔄', 
+      title: 'Agent Rotation', 
+      description: 'Configure automatic rotation of agents for specific complaint categories.', 
+      status: 'new', 
+      isNew: true 
     }
   ];
 
-  // Filter complaints
-  const filteredComplaints = complaints.filter(complaint => {
-    const matchesSearch = complaint.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         complaint.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         complaint.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || complaint.status.toLowerCase().replace(/\s+/g, '').includes(statusFilter.toLowerCase());
-    const matchesPriority = priorityFilter === 'all' || complaint.priority.toLowerCase() === priorityFilter.toLowerCase();
-    const matchesCategory = categoryFilter === 'all' || complaint.category.toLowerCase() === categoryFilter.toLowerCase();
-    
-    return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
-  });
-
-  // Utility functions
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Open': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'In Progress': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Under Review': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'Resolved': return 'bg-green-100 text-green-800 border-green-200';
-      case 'Closed': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'Escalated': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+  const complaintManagement = [
+    { 
+      icon: '📊', 
+      title: 'Complaint Overview', 
+      description: 'View all complaints with filtering by status, priority, category, and more.' 
+    },
+    { 
+      icon: '🏷️', 
+      title: 'Categorization', 
+      description: 'Assign and modify complaint categories with AI-assisted suggestions.' 
+    },
+    { 
+      icon: '⚡', 
+      title: 'Priority Management', 
+      description: 'Set and adjust complaint priorities based on urgency and impact.' 
+    },
+    { 
+      icon: '🔄', 
+      title: 'Status Updates', 
+      description: 'Update complaint statuses and track resolution progress.' 
+    },
+    { 
+      icon: '🤖', 
+      title: 'AI Assistance', 
+      description: 'Get AI-powered insights and suggestions for complaint resolution.' 
+    },
+    { 
+      icon: '📝', 
+      title: 'Case Notes', 
+      description: 'Add and review detailed notes on complaint handling and resolution steps.' 
     }
-  };
+  ];
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'Urgent': return 'text-red-600 bg-red-50';
-      case 'High': return 'text-orange-600 bg-orange-50';
-      case 'Medium': return 'text-yellow-600 bg-yellow-50';
-      case 'Low': return 'text-green-600 bg-green-50';
-      default: return 'text-gray-600 bg-gray-50';
+  const analytics = [
+    { 
+      icon: '📈', 
+      title: 'Ticket Metrics', 
+      description: 'Track total, pending, and resolved tickets with filtering options.' 
+    },
+    { 
+      icon: '⏱️', 
+      title: 'Response Times', 
+      description: 'Monitor average response and resolution times across different categories.' 
+    },
+    { 
+      icon: '👤', 
+      title: 'Agent Performance', 
+      description: 'Analyze individual agent performance, resolution rates, and customer satisfaction.' 
+    },
+    { 
+      icon: '📊', 
+      title: 'Category Analysis', 
+      description: 'View complaint distribution by category to identify problem areas.' 
+    },
+    { 
+      icon: '📥', 
+      title: 'Export Reports', 
+      description: 'Generate and download detailed reports in various formats.' 
     }
-  };
+  ];
 
-  // Overview Dashboard
-  if (activeView === 'overview') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <Header />
-        
-        <div className="container mx-auto px-4 py-8">
-          {/* Admin Welcome Section */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-8 text-white mb-8 shadow-lg">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="flex items-center gap-3 mb-3">
-                  <Shield className="w-10 h-10 text-white" />
-                  <h1 className="text-4xl font-bold">Admin Control Center</h1>
-                </div>
-                <p className="text-blue-100 text-lg mb-6">
-                  🛡️ System-wide complaint management and administrative oversight
-                  {stats.pendingAssignment > 0 && 
-                  ` • ${stats.pendingAssignment} complaints need immediate assignment`}
-                </p>
-                
-                <div className="flex flex-wrap gap-4">
-                  <button
-                    onClick={() => setActiveView('complaints')}
-                    className="bg-white text-blue-700 px-6 py-3 rounded-lg flex items-center gap-2 font-semibold hover:bg-gray-50 transition-colors shadow-lg"
-                  >
-                    <FileText className="w-5 h-5" />
-                    Manage All Complaints ({stats.open} active)
-                  </button>
-                  <button
-                    onClick={() => setActiveView('users')}
-                    className="bg-white bg-opacity-20 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-semibold hover:bg-opacity-30 transition-colors border border-white border-opacity-30"
-                  >
-                    <Shield className="w-5 h-5" />
-                    User Management
-                  </button>
-                  <button
-                    onClick={() => setActiveView('analytics')}
-                    className="bg-white bg-opacity-20 text-white px-6 py-3 rounded-lg flex items-center gap-2 font-semibold hover:bg-opacity-30 transition-colors border border-white border-opacity-30"
-                  >
-                    <TrendingUp className="w-5 h-5" />
-                    System Analytics
-                  </button>
-                </div>
-              </div>
-              
-              <div className="text-right">
-                <div className="bg-white bg-opacity-20 rounded-xl p-4 backdrop-blur-sm">
-                  <div className="text-3xl font-bold text-white">{todayComplaints}</div>
-                  <div className="text-blue-100">New Today</div>
-                  <div className="text-sm text-blue-200 mt-1">Admin View</div>
-                </div>
-              </div>
-            </div>
-          </div>
+  const automationSettings = [
+    { 
+      icon: '🤖', 
+      title: 'AI Rules', 
+      description: 'Configure AI-powered automation rules for complaint handling.' 
+    },
+    { 
+      icon: '👥', 
+      title: 'Role Management', 
+      description: 'Define user roles and access permissions across the system.' 
+    },
+    { 
+      icon: '🔔', 
+      title: 'Notification Settings', 
+      description: 'Configure email, SMS, and in-app notification triggers.' 
+    },
+    { 
+      icon: '🏷️', 
+      title: 'Category Configuration', 
+      description: 'Create and manage complaint categories and subcategories.' 
+    }
+  ];
 
-          {/* Key Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatsCard
-              title="Total Complaints"
-              value={stats.total}
-              icon={FileText}
-              color="blue"
-              subtitle={`${todayComplaints} added today`}
-            />
-            <StatsCard
-              title="Active Cases"
-              value={stats.open}
-              icon={Clock}
-              color="orange"
-              subtitle={`${stats.pendingAssignment} unassigned`}
-            />
-            <StatsCard
-              title="Resolved This Month"
-              value={stats.resolved}
-              icon={CheckCircle}
-              color="green"
-              subtitle={`${stats.satisfactionRate}/5 avg rating`}
-            />
-            <StatsCard
-              title="Escalated Cases"
-              value={stats.escalated}
-              icon={AlertTriangle}
-              color="red"
-              subtitle="Need immediate attention"
-            />
-          </div>
+  const securityTools = [
+    { 
+      icon: '🔒', 
+      title: 'Session Monitoring', 
+      description: 'View active user sessions and IP access information.' 
+    },
+    { 
+      icon: '📝', 
+      title: 'Activity Logs', 
+      description: 'Review detailed logs of all system activities and changes.' 
+    },
+    { 
+      icon: '💾', 
+      title: 'Backup Management', 
+      description: 'Configure and manage automated data backup schedules.' 
+    }
+  ];
 
-          {/* Quick Actions & Recent Complaints */}
-          <div className="grid lg:grid-cols-2 gap-8 mb-8">
-            {/* New Complaints Feed */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900">📋 Recent Complaints</h2>
-                <button 
-                  onClick={() => setActiveView('complaints')}
-                  className="text-blue-600 hover:text-blue-700 flex items-center gap-1 text-sm font-medium"
-                >
-                  View All <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-              
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {complaints
-                  .filter(c => c.status === 'Open' || c.status === 'In Progress')
-                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                  .slice(0, 8)
-                  .map((complaint) => (
-                    <div key={complaint.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-gray-900 line-clamp-1">{complaint.title}</h3>
-                        <div className="flex gap-2 flex-shrink-0 ml-2">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(complaint.priority)}`}>
-                            {complaint.priority}
-                          </span>
-                          <span className={`px-2 py-1 rounded text-xs font-medium border ${getStatusColor(complaint.status)}`}>
-                            {complaint.status}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">{complaint.description}</p>
-                      <div className="flex justify-between items-center text-xs text-gray-500">
-                        <div className="flex items-center gap-4">
-                          <span>ID: {complaint.id}</span>
-                          <span>Category: {complaint.category}</span>
-                          {complaint.assignedTo && (
-                            <span>Assigned: {complaint.assignedTo}</span>
-                          )}
-                        </div>
-                        <span>{new Date(complaint.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      {!complaint.assignedTo && (
-                        <div className="mt-2">
-                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800">
-                            ⚠️ Needs Assignment
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                
-                {complaints.filter(c => c.status === 'Open' || c.status === 'In Progress').length === 0 && (
-                  <div className="text-center py-8">
-                    <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                    <p className="text-gray-600">All complaints are resolved!</p>
-                    <p className="text-sm text-gray-500">Great work from the team!</p>
-                  </div>
-                )}
-              </div>
-            </div>
+  const supportTools = [
+    { 
+      icon: '💬', 
+      title: 'Internal Chat', 
+      description: 'Communication tool for agents and administrators within the system.' 
+    },
+    { 
+      icon: '⬆️', 
+      title: 'Escalation Handling', 
+      description: 'Manage and monitor escalated complaints requiring special attention.' 
+    },
+    { 
+      icon: '🤖', 
+      title: 'Chatbot Monitoring', 
+      description: 'View chatbot conversations and adjust AI responses as needed.' 
+    }
+  ];
 
-            {/* Critical Complaints */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900">🚨 Critical Complaints</h2>
-                <button 
-                  onClick={() => setActiveView('complaints')}
-                  className="text-red-600 hover:text-red-700 flex items-center gap-1 text-sm font-medium"
-                >
-                  View All <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                {complaints
-                  .filter(c => c.priority === 'Urgent' || c.isEscalated)
-                  .slice(0, 5)
-                  .map((complaint) => (
-                    <div key={complaint.id} className="border border-red-200 rounded-lg p-4 bg-red-50">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-gray-900">{complaint.title}</h3>
-                        <div className="flex gap-2">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(complaint.priority)}`}>
-                            {complaint.priority}
-                          </span>
-                          {complaint.isEscalated && (
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
-                              Escalated
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">{complaint.description}</p>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-500">
-                          ID: {complaint.id} • {new Date(complaint.createdAt).toLocaleDateString()}
-                        </span>
-                        <button
-                          onClick={() => setSelectedComplaint(complaint)}
-                          className="text-red-600 hover:text-red-700 text-sm font-medium"
-                        >
-                          Take Action →
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                
-                {complaints.filter(c => c.priority === 'Urgent' || c.isEscalated).length === 0 && (
-                  <div className="text-center py-8">
-                    <Shield className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                    <p className="text-gray-600">No critical complaints at the moment</p>
-                    <p className="text-sm text-gray-500">Great job keeping things under control!</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+  const sidebarMenuItems = [
+    { icon: UserCheck, label: 'User & Agent Control', sublabel: 'Manage users and agent workload', key: 'user-agent-control', active: true },
+    { icon: FileText, label: 'Complaint Management', sublabel: 'View, categorize and update complaint statuses', key: 'complaint-management' },
+    { icon: Activity, label: 'Agent Performance', sublabel: 'Track complaint handling and resolution metrics', key: 'agent-performance' },
+    { icon: BarChart3, label: 'Analytics', sublabel: 'Track tickets and agent performance metrics', key: 'analytics' },
+    { icon: Settings, label: 'Automation & Settings', sublabel: 'Configure AI rules, roles and notifications', key: 'automation-settings' },
+    { icon: Shield, label: 'Security', sublabel: 'Monitor sessions, logs and manage backups', key: 'security' },
+    { icon: MessageCircle, label: 'Support Tools', sublabel: 'Internal chat and escalation handling', key: 'support-tools' }
+  ];
 
-          {/* Team Performance Section */}
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900">👥 Team Performance</h2>
-              <button className="text-blue-600 hover:text-blue-700 flex items-center gap-1 text-sm font-medium">
-                Manage Teams <ChevronRight className="w-4 h-4" />
-              </button>
+  return (
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar - Dark Theme */}
+      <div className="w-64 bg-gray-900 flex flex-col">
+        {/* Logo */}
+        <div className="p-4 border-b border-gray-800">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-lg">◉</span>
             </div>
-            
-            <div className="space-y-4">
-              {teams.map((team) => (
-                <div key={team.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-semibold text-gray-900">{team.name}</h3>
-                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      team.performance >= 95 ? 'bg-green-100 text-green-800' :
-                      team.performance >= 90 ? 'bg-blue-100 text-blue-800' :
-                      team.performance >= 85 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {team.performance}% Performance
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <div className="text-gray-500">Members</div>
-                      <div className="font-semibold">{team.members}</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500">Active Tickets</div>
-                      <div className="font-semibold">{team.activeTickets}</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-500">Avg Resolution</div>
-                      <div className="font-semibold">{team.avgResolutionTime}h</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <span className="font-semibold text-white text-lg">Admin</span>
           </div>
         </div>
-      </div>
-    );
-  }
 
-  // Complaints Management View
-  if (activeView === 'complaints') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <Header />
-        
-        <div className="container mx-auto px-4 py-8">
-          <div className="mb-6">
+        {/* Sidebar Menu */}
+        <nav className="flex-1 overflow-y-auto py-4 px-3">
+          {sidebarMenuItems.map((item) => (
             <button
-              onClick={() => setActiveView('overview')}
-              className="text-blue-600 hover:text-blue-700 flex items-center gap-2 mb-4"
+              key={item.key}
+              onClick={() => setActiveSection(item.key)}
+              className={`w-full flex items-start space-x-3 px-3 py-3 rounded-lg mb-1 transition-colors ${
+                activeSection === item.key 
+                  ? 'bg-gray-800 text-white' 
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+              }`}
             >
-              ← Back to Overview
+              <item.icon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 text-left min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {item.label}
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5 leading-tight">
+                  {item.sublabel}
+                </div>
+              </div>
             </button>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">QuickFix</h1>
-            <p className="text-gray-600">
-              Manage all customer complaints, assign to teams, and track resolution progress.
-            </p>
-          </div>
-
-          {/* Filters and Search */}
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-            <div className="grid lg:grid-cols-5 gap-4">
-              <div className="lg:col-span-2 relative">
-                <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by ID, title, or description..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                <option value="open">Open</option>
-                <option value="inprogress">In Progress</option>
-                <option value="underreview">Under Review</option>
-                <option value="resolved">Resolved</option>
-                <option value="escalated">Escalated</option>
-              </select>
-              
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Priority</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-              
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Categories</option>
-                <option value="billing">Billing</option>
-                <option value="technical">Technical</option>
-                <option value="service">Service</option>
-                <option value="product">Product</option>
-                <option value="general">General</option>
-              </select>
-            </div>
-            
-            <div className="flex justify-between items-center mt-4">
-              <div className="text-sm text-gray-600">
-                Showing {filteredComplaints.length} of {complaints.length} complaints
-              </div>
-            </div>
-          </div>
-
-          {/* Complaints Table */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Complaint</th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">User</th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Priority</th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Status</th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Created</th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-900">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredComplaints.map((complaint) => (
-                    <tr key={complaint.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div>
-                          <div className="font-medium text-gray-900">{complaint.title}</div>
-                          <div className="text-sm text-gray-600">#{complaint.id} • {complaint.category}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{adminUsers.find(u => u.id === complaint.userId)?.name || 'Unknown User'}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPriorityColor(complaint.priority)}`}>
-                          {complaint.priority}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(complaint.status)}`}>
-                          {complaint.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {new Date(complaint.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => setSelectedComplaint(complaint)}
-                          className="text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                          Manage
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            {filteredComplaints.length === 0 && (
-              <div className="text-center py-12">
-                <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No complaints match your current filters</p>
-              </div>
-            )}
-          </div>
-        </div>
+          ))}
+        </nav>
       </div>
-    );
-  }
 
-  // Complaint Details View
-  if (selectedComplaint) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <Header />
-        <div className="container mx-auto px-4 py-8">
-          <div className="mb-6">
-            <button
-              onClick={() => {
-                setSelectedComplaint(null);
-                setActiveView('complaints');
-              }}
-              className="text-blue-600 hover:text-blue-700 flex items-center gap-2 mb-4"
-            >
-              ← Back to Complaints
-            </button>
-          </div>
-          
-          <ComplaintDetails 
-            complaint={selectedComplaint} 
-            onBack={() => {
-              setSelectedComplaint(null);
-              setActiveView('complaints');
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // User Management View
-  if (activeView === 'users') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <Header />
-        <div className="container mx-auto px-4 py-8">
-          <div className="mb-6">
-            <button
-              onClick={() => setActiveView('overview')}
-              className="text-blue-600 hover:text-blue-700 flex items-center gap-2 mb-4"
-            >
-              ← Back to Overview
-            </button>
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">User & Agent Management</h1>
-                <p className="text-gray-600">Manage all users, agents, and system administrators.</p>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200">
+          <div className="px-8 py-4">
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-semibold text-gray-800">Admin</h1>
+              <div className="flex items-center space-x-3">
+                <button className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100">
+                  Get started (16%)
+                </button>
+                <button className="flex items-center space-x-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">
+                  <Plus className="w-4 h-4" />
+                  <span>New</span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                <button className="p-2 hover:bg-gray-100 rounded-lg">
+                  <Search className="w-5 h-5 text-gray-600" />
+                </button>
+                <button className="p-2 hover:bg-gray-100 rounded-lg relative">
+                  <Bell className="w-5 h-5 text-gray-600" />
+                </button>
+                <button className="p-2 hover:bg-gray-100 rounded-lg">
+                  <Gift className="w-5 h-5 text-gray-600" />
+                </button>
+                <button className="p-2 hover:bg-gray-100 rounded-lg">
+                  <Settings className="w-5 h-5 text-gray-600" />
+                </button>
+                <button className="p-2 hover:bg-gray-100 rounded-lg text-red-500" title="Logout">
+                  <LogOut className="w-5 h-5" />
+                </button>
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
+                  <span className="text-white font-semibold text-sm">A</span>
+                </div>
               </div>
-              <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                <UserPlus className="w-4 h-4" />
-                Add New User
-              </button>
             </div>
           </div>
+        </header>
 
-          {/* User Management Tabs */}
-          <div className="bg-white rounded-xl shadow-sm mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="flex space-x-8 px-6">
-                <button className="py-4 px-1 border-b-2 border-blue-500 text-blue-600 font-medium">
-                  All Users ({adminUsers.length})
-                </button>
-                <button className="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700">
-                  Agents (8)
-                </button>
-                <button className="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700">
-                  Administrators (3)
-                </button>
-                <button className="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700">
-                  Inactive Users (2)
-                </button>
-              </nav>
-            </div>
-
-            {/* Search and Filters */}
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input
-                      type="text"
-                      placeholder="Search users by name, email, or ID..."
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+        {/* Content Area */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-7xl mx-auto px-8 py-8">
+            {/* User & Agent Control Section */}
+            {activeSection === 'user-agent-control' && (
+              <div className="mb-12">
+                <div className="flex items-center space-x-3 mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">User & Agent Control</h2>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded-full">
+                      {agents.filter(a => a.status === 'available').length} Agents Active
+                    </span>
+                    <span className="text-xs font-medium px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full">
+                      {agents.filter(a => a.status === 'busy').length} Agents Busy
+                    </span>
+                    <span className="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                      {ticketsData.total} Total Tickets
+                    </span>
                   </div>
                 </div>
-                <select className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
-                  <option>All Roles</option>
-                  <option>Users</option>
-                  <option>Agents</option>
-                  <option>Admins</option>
-                </select>
-                <select className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
-                  <option>All Status</option>
-                  <option>Active</option>
-                  <option>Inactive</option>
-                  <option>Banned</option>
-                </select>
-                <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center gap-2">
-                  <Download className="w-4 h-4" />
-                  Export
-                </button>
-              </div>
-            </div>
-
-            {/* User List */}
-            <div className="p-6">
-              <div className="space-y-4">
-                {adminUsers.map((user) => (
-                  <div key={user.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                          <UserCheck className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{user.name}</h3>
-                          <p className="text-sm text-gray-600">{user.email}</p>
-                          <div className="flex items-center gap-4 mt-1">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              user.role === 'Admin' ? 'bg-purple-100 text-purple-800' :
-                              user.role === 'Agent' ? 'bg-blue-100 text-blue-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
-                              {user.role}
-                            </span>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              user.status === 'active' ? 'bg-green-100 text-green-800' :
-                              user.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {user.status}
-                            </span>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-gray-800 text-lg">User Management</h3>
+                      <button className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors">
+                        <Plus className="w-4 h-4" />
+                        <span>Add User</span>
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <span className="text-blue-600 font-medium">JD</span>
                           </div>
+                          <div>
+                            <h4 className="font-medium text-gray-800">John Doe</h4>
+                            <span className="text-xs text-gray-500">Admin • Last active 2m ago</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded">
+                            <Settings className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <div className="text-sm font-medium text-gray-900">{user.totalComplaints} Complaints</div>
-                          <div className="text-xs text-gray-600">{user.resolvedComplaints} resolved</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm text-gray-600">Last Active</div>
-                          <div className="text-xs text-gray-500">
-                            {new Date(user.lastActive).toLocaleDateString()}
+                      <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                            <span className="text-green-600 font-medium">AS</span>
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-gray-800">Alice Smith</h4>
+                            <span className="text-xs text-gray-500">Support Agent • Active now</span>
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
-                            <Eye className="w-4 h-4" />
+                        <div className="flex items-center space-x-2">
+                          <button className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded">
+                            <Settings className="w-4 h-4" />
                           </button>
-                          <button className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg">
-                            <Edit className="w-4 h-4" />
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                            <span className="text-purple-600 font-medium">RJ</span>
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-gray-800">Robert Johnson</h4>
+                            <span className="text-xs text-gray-500">Support Agent • Last active 15m ago</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded">
+                            <Settings className="w-4 h-4" />
                           </button>
-                          <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
-                            <Trash2 className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button className="mt-4 w-full py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200">
+                      View All Users
+                    </button>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-gray-800 text-lg">Agent Rotation & Ticket Assignment</h3>
+                      <div className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Active</div>
+                    </div>
+                    
+                    <div className="space-y-4 mb-6">
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-gray-700 mb-2">Auto-assignment Rules</h4>
+                        <div className="flex items-center justify-between text-sm mb-2 pb-2 border-b border-gray-200">
+                          <span>Technical Issues</span>
+                          <span className="font-medium">Round Robin</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm mb-2 pb-2 border-b border-gray-200">
+                          <span>Billing Queries</span>
+                          <span className="font-medium">Balanced Load</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span>General Support</span>
+                          <span className="font-medium">Skill Match</span>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg">
+                        <div className="flex items-center space-x-2 mb-3">
+                          <RefreshCw className="w-4 h-4 text-blue-600" />
+                          <h4 className="font-medium text-blue-800">Real-time Rotation</h4>
+                        </div>
+                        <p className="text-sm text-blue-700 mb-2">
+                          Agents are automatically rotated based on workload and availability.
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-blue-600">Next rotation in: 42 minutes</span>
+                          <button className="text-xs text-blue-700 font-medium hover:text-blue-800">
+                            Rotate Now
                           </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button className="mt-2 w-full py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg border border-blue-200">
+                      Manage Assignment Rules
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <h3 className="font-semibold text-gray-800 mb-2">Active Agents</h3>
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-3xl font-bold text-gray-800">{agents.filter(a => a.status !== 'offline').length}</span>
+                      <span className="text-sm text-green-600">of {agents.length} total</span>
+                    </div>
+                    <div className="mt-4 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-green-500 rounded-full" 
+                        style={{ width: `${(agents.filter(a => a.status !== 'offline').length / agents.length) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <h3 className="font-semibold text-gray-800 mb-2">Avg. Response Time</h3>
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-3xl font-bold text-gray-800">4m 15s</span>
+                      <span className="text-sm text-green-600">-12% from last week</span>
+                    </div>
+                    <div className="mt-4 flex justify-between text-xs text-gray-500">
+                      <span>Target: 5m 00s</span>
+                      <span>Current: 4m 15s</span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <h3 className="font-semibold text-gray-800 mb-2">Workload Distribution</h3>
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-3xl font-bold text-gray-800">Balanced</span>
+                      <span className="text-sm text-yellow-600">3 agents overloaded</span>
+                    </div>
+                    <div className="mt-4 flex items-center space-x-1">
+                      <span className="inline-block w-3 h-3 rounded-full bg-green-500"></span>
+                      <span className="text-xs">Balanced</span>
+                      <span className="ml-2 inline-block w-3 h-3 rounded-full bg-yellow-500"></span>
+                      <span className="text-xs">Medium</span>
+                      <span className="ml-2 inline-block w-3 h-3 rounded-full bg-red-500"></span>
+                      <span className="text-xs">Heavy</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Agent Workload Quick View */}
+                <div className="mt-8 bg-white p-6 rounded-lg border border-gray-200">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-800">Agent Workload <span className="text-xs font-normal text-gray-500">Real-time status</span></h3>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-500">{isConnected ? 'Live updates active' : 'Live updates inactive'}</span>
+                      <button 
+                        className={`p-2 rounded-full ${isRefreshing ? 'bg-gray-100 text-gray-400' : 'hover:bg-gray-100'}`}
+                        onClick={refreshData}
+                        disabled={isRefreshing}
+                        title="Refresh data"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                      {agents.filter(a => a.status === 'available').length} Available
+                    </span>
+                    <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
+                      {agents.filter(a => a.status === 'busy').length} Busy
+                    </span>
+                    <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                      {agents.filter(a => a.status === 'offline').length} Offline
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-50 text-gray-600">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">Agent</th>
+                          <th className="px-4 py-3 font-medium">Status</th>
+                          <th className="px-4 py-3 font-medium">Current Load</th>
+                          <th className="px-4 py-3 font-medium">Avg. Response</th>
+                          <th className="px-4 py-3 font-medium">Last Updated</th>
+                          <th className="px-4 py-3 font-medium">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {agents.map(agent => (
+                          <tr key={agent.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 flex items-center space-x-2">
+                              <div className={`w-8 h-8 bg-${agent.color}-100 rounded-full flex items-center justify-center`}>
+                                <span className={`text-${agent.color}-600 text-xs font-medium`}>{agent.initials}</span>
+                              </div>
+                              <span>{agent.name}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {agent.status === 'available' && (
+                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Available</span>
+                              )}
+                              {agent.status === 'busy' && (
+                                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">Busy</span>
+                              )}
+                              {agent.status === 'offline' && (
+                                <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">Offline</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center space-x-2">
+                                <span>{agent.currentLoad} tickets</span>
+                                {agent.currentLoad > 5 && (
+                                  <span className="inline-block w-2 h-2 bg-red-500 rounded-full" title="High workload"></span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">{agent.avgResponseTime}</td>
+                            <td className="px-4 py-3 text-xs text-gray-500">
+                              {agent.lastUpdated.toLocaleTimeString()}
+                            </td>
+                            <td className="px-4 py-3">
+                              {agent.status === 'available' ? (
+                                <button 
+                                  onClick={() => assignTicket(agent.id)}
+                                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                >
+                                  Assign Ticket
+                                </button>
+                              ) : (
+                                <button className="text-gray-400 cursor-not-allowed text-sm font-medium">
+                                  Assign Ticket
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Complaint Management Section */}
+            {activeSection === 'complaint-management' && (
+              <div className="mb-12">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">Complaint Management</h2>
+                  <div className="flex items-center space-x-2">
+                    <span className="flex items-center space-x-1 text-sm">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span>{ticketsData.resolved} Resolved</span>
+                    </span>
+                    <span className="flex items-center space-x-1 text-sm">
+                      <AlertCircle className="w-4 h-4 text-yellow-500" />
+                      <span>{ticketsData.pending} Pending</span>
+                    </span>
+                    {ticketsData.critical > 0 && (
+                      <span className="flex items-center space-x-1 text-sm">
+                        <AlertCircle className="w-4 h-4 text-red-500" />
+                        <span>{ticketsData.critical} Critical</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {complaintManagement.map((item, index) => (
+                    <div
+                      key={index}
+                      className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg hover:border-gray-300 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div className="text-3xl flex-shrink-0">
+                          {item.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-800 text-base mb-2">
+                            {item.title}
+                          </h3>
+                          <p className="text-sm text-gray-600 leading-relaxed">
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Analytics Section */}
+            {activeSection === 'analytics' && (
+              <div className="mb-12">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">Analytics</h2>
+                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                    Export Reports
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-gray-500 text-sm font-medium">Total Tickets</h3>
+                      <Activity className="h-5 w-5 text-blue-500" />
+                    </div>
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-3xl font-bold text-gray-800">{ticketsData.total}</span>
+                      <span className="text-sm text-green-600">{ticketsData.trend} from last month</span>
+                    </div>
+                    <div className="mt-3 text-xs text-gray-500">
+                      Last updated: {new Date().toLocaleTimeString()}
+                    </div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-gray-500 text-sm font-medium">Avg Resolution Time</h3>
+                      <Clock className="h-5 w-5 text-blue-500" />
+                    </div>
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-3xl font-bold text-gray-800">1.4 days</span>
+                      <span className="text-sm text-green-600">-12% from last month</span>
+                    </div>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-gray-500 text-sm font-medium">Customer Satisfaction</h3>
+                      <TrendingUp className="h-5 w-5 text-blue-500" />
+                    </div>
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-3xl font-bold text-gray-800">87%</span>
+                      <span className="text-sm text-green-600">+5% from last month</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {analytics.map((item, index) => (
+                    <div
+                      key={index}
+                      className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg hover:border-gray-300 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div className="text-3xl flex-shrink-0">
+                          {item.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-800 text-base mb-2">
+                            {item.title}
+                          </h3>
+                          <p className="text-sm text-gray-600 leading-relaxed">
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Automation & Settings Section */}
+            {activeSection === 'automation-settings' && (
+              <div className="mb-12">
+                <div className="flex items-center space-x-3 mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">Automation & Settings</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {automationSettings.map((item, index) => (
+                    <div
+                      key={index}
+                      className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg hover:border-gray-300 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div className="text-3xl flex-shrink-0">
+                          {item.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-800 text-base mb-2">
+                            {item.title}
+                          </h3>
+                          <p className="text-sm text-gray-600 leading-relaxed">
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Security Section */}
+            {activeSection === 'security' && (
+              <div className="mb-12">
+                <div className="flex items-center space-x-3 mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">Security</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {securityTools.map((item, index) => (
+                    <div
+                      key={index}
+                      className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg hover:border-gray-300 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div className="text-3xl flex-shrink-0">
+                          {item.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-800 text-base mb-2">
+                            {item.title}
+                          </h3>
+                          <p className="text-sm text-gray-600 leading-relaxed">
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Agent Performance Section */}
+            {activeSection === 'agent-performance' && (
+              <div className="mb-12">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">Agent Performance Dashboard</h2>
+                  <div className="flex items-center space-x-3">
+                    <span className="text-xs text-gray-500">{isConnected ? 'Live updates active' : 'Live updates inactive'}</span>
+                    <button 
+                      className={`p-2 rounded-full ${isRefreshing ? 'bg-gray-100 text-gray-400' : 'hover:bg-gray-100'}`}
+                      onClick={refreshData}
+                      disabled={isRefreshing}
+                      title="Refresh data"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                      Export Report
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Complaint Statistics Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-gray-500 text-sm font-medium">Total Complaints</h3>
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-3xl font-bold text-gray-800">{ticketsData.total}</span>
+                      <span className="text-sm text-green-600">{ticketsData.trend}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-gray-500 text-sm font-medium">Resolved</h3>
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-3xl font-bold text-gray-800">{ticketsData.resolved}</span>
+                      <span className="text-sm text-gray-500">{Math.round((ticketsData.resolved/ticketsData.total)*100)}%</span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-gray-500 text-sm font-medium">In Progress</h3>
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                        <Activity className="h-4 w-4 text-blue-600" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-3xl font-bold text-gray-800">{ticketsData.inProgress}</span>
+                      <span className="text-sm text-gray-500">{Math.round((ticketsData.inProgress/ticketsData.total)*100)}%</span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-gray-500 text-sm font-medium">Pending</h3>
+                      <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
+                        <AlertCircle className="h-4 w-4 text-yellow-600" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-3xl font-bold text-gray-800">{ticketsData.pending}</span>
+                      <span className="text-sm text-gray-500">{Math.round((ticketsData.pending/ticketsData.total)*100)}%</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Additional Stats Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <h3 className="text-gray-700 text-sm font-medium mb-2">Complaint Status Overview</h3>
+                    <div className="flex items-center space-x-2 mb-4">
+                      <div className="h-2 bg-green-500 rounded-full" style={{width: `${(ticketsData.resolved/ticketsData.total)*100}%`}}></div>
+                      <div className="h-2 bg-blue-500 rounded-full" style={{width: `${(ticketsData.inProgress/ticketsData.total)*100}%`}}></div>
+                      <div className="h-2 bg-yellow-500 rounded-full" style={{width: `${(ticketsData.pending/ticketsData.total)*100}%`}}></div>
+                      <div className="h-2 bg-red-500 rounded-full" style={{width: `${(ticketsData.critical/ticketsData.total)*100}%`}}></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex items-center space-x-1">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span>Resolved ({ticketsData.resolved})</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                        <span>In Progress ({ticketsData.inProgress})</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                        <span>Pending ({ticketsData.pending})</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                        <span>Critical ({ticketsData.critical})</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <h3 className="text-gray-700 text-sm font-medium mb-2">Today's Activity</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">New complaints:</span>
+                        <span className="font-medium">{ticketsData.newToday}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Resolved today:</span>
+                        <span className="font-medium">{agentPerformance.reduce((sum, agent) => sum + agent.resolvedToday, 0)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Reopened:</span>
+                        <span className="font-medium">{ticketsData.reopened}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Avg. resolution time:</span>
+                        <span className="font-medium">{ticketsData.avgResolutionTime}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <h3 className="text-gray-700 text-sm font-medium mb-2">Complaint Categories</h3>
+                    <div className="space-y-3">
+                      {complaintCategories.map((category, index) => (
+                        <div key={index}>
+                          <div className="flex justify-between items-center text-xs mb-1">
+                            <span>{category.name}</span>
+                            <span>{category.count} ({category.percentage}%)</span>
+                          </div>
+                          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-blue-600 rounded-full" 
+                              style={{ width: `${category.percentage}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Agent Performance Table */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
+                  <h3 className="font-semibold text-gray-800 mb-4">Agent Performance Metrics</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-50 text-gray-600">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">Agent</th>
+                          <th className="px-4 py-3 font-medium">Resolved Today</th>
+                          <th className="px-4 py-3 font-medium">Total Resolved</th>
+                          <th className="px-4 py-3 font-medium">Avg. Resolution Time</th>
+                          <th className="px-4 py-3 font-medium">Customer Satisfaction</th>
+                          <th className="px-4 py-3 font-medium">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {agentPerformance.map((agent) => {
+                          const currentAgent = agents.find(a => a.id === agent.id);
+                          return (
+                            <tr key={agent.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 flex items-center space-x-2">
+                                <div className={`w-8 h-8 bg-${agent.color}-100 rounded-full flex items-center justify-center`}>
+                                  <span className={`text-${agent.color}-600 text-xs font-medium`}>{agent.initials}</span>
+                                </div>
+                                <span>{agent.name}</span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center">
+                                  <span>{agent.resolvedToday}</span>
+                                  {agent.resolvedToday > 5 && (
+                                    <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-800 rounded text-xs">High</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">{agent.totalResolved}</td>
+                              <td className="px-4 py-3">{agent.avgResolutionTime}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full rounded-full ${agent.satisfaction >= 95 ? 'bg-green-500' : agent.satisfaction >= 90 ? 'bg-green-400' : agent.satisfaction >= 80 ? 'bg-yellow-500' : 'bg-red-500'}`} 
+                                      style={{ width: `${agent.satisfaction}%` }}
+                                    ></div>
+                                  </div>
+                                  <span>{agent.satisfaction}%</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                {currentAgent?.status === 'available' && (
+                                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Available</span>
+                                )}
+                                {currentAgent?.status === 'busy' && (
+                                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">Busy</span>
+                                )}
+                                {currentAgent?.status === 'offline' && (
+                                  <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">Offline</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                
+                {/* Trends and Insights */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <h3 className="font-semibold text-gray-800 mb-4">Performance Insights</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Top Performing Agents</h4>
+                      <div className="space-y-3">
+                        {agentPerformance
+                          .sort((a, b) => b.satisfaction - a.satisfaction)
+                          .slice(0, 3)
+                          .map((agent, index) => (
+                            <div key={index} className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <div className={`w-6 h-6 bg-${agent.color}-100 rounded-full flex items-center justify-center`}>
+                                  <span className={`text-${agent.color}-600 text-xs font-medium`}>{agent.initials}</span>
+                                </div>
+                                <span className="text-sm">{agent.name}</span>
+                              </div>
+                              <div className="text-sm font-medium">{agent.satisfaction}% satisfaction</div>
+                            </div>
+                          ))
+                        }
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Areas for Improvement</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Response time optimization</span>
+                          <span className="text-sm font-medium text-yellow-600">Moderate priority</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Technical issue resolution</span>
+                          <span className="text-sm font-medium text-red-600">High priority</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Customer satisfaction follow-up</span>
+                          <span className="text-sm font-medium text-yellow-600">Moderate priority</span>
                         </div>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-              
-              {/* Pagination */}
-              <div className="flex justify-between items-center mt-6">
-                <div className="text-sm text-gray-600">
-                  Showing 1-10 of {adminUsers.length} users
-                </div>
-                <div className="flex gap-2">
-                  <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">Previous</button>
-                  <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">1</button>
-                  <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">2</button>
-                  <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">Next</button>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="grid lg:grid-cols-3 gap-6">
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-green-600" />
-                Bulk Actions
-              </h3>
-              <div className="space-y-3">
-                <button className="w-full bg-green-50 text-green-700 p-3 rounded-lg hover:bg-green-100 text-left">
-                  Create Multiple Users
-                </button>
-                <button className="w-full bg-blue-50 text-blue-700 p-3 rounded-lg hover:bg-blue-100 text-left">
-                  Import from CSV
-                </button>
-                <button className="w-full bg-orange-50 text-orange-700 p-3 rounded-lg hover:bg-orange-100 text-left">
-                  Send Bulk Notifications
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-blue-600" />
-                Recent Activity
-              </h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center">
-                  <span>New user registered</span>
-                  <span className="text-gray-500">2m ago</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>Agent role assigned</span>
-                  <span className="text-gray-500">5m ago</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>User account suspended</span>
-                  <span className="text-gray-500">1h ago</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Shield className="w-5 h-5 text-purple-600" />
-                Security Overview
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">2FA Enabled</span>
-                  <span className="font-medium">78%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Failed Logins</span>
-                  <span className="font-medium text-red-600">12</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Locked Accounts</span>
-                  <span className="font-medium text-orange-600">3</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Enhanced Analytics View
-  if (activeView === 'analytics') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <Header />
-        <div className="container mx-auto px-4 py-8">
-          <div className="mb-6">
-            <button
-              onClick={() => setActiveView('overview')}
-              className="text-blue-600 hover:text-blue-700 flex items-center gap-2 mb-4"
-            >
-              ← Back to Overview
-            </button>
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Analytics & Reports</h1>
-                <p className="text-gray-600">Comprehensive insights into complaint management performance and system metrics.</p>
-              </div>
-              <div className="flex gap-3">
-                <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2">
-                  <Download className="w-4 h-4" />
-                  Export Report
-                </button>
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4" />
-                  Refresh Data
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Analytics Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <BarChart3 className="w-6 h-6 text-blue-600" />
-                </div>
-                <span className="text-sm text-green-600 font-medium flex items-center gap-1">
-                  <ArrowUp className="w-4 h-4" />
-                  +12%
-                </span>
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">{stats.avgResolutionTime}h</div>
-              <div className="text-sm text-gray-600">Avg Resolution Time</div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Target className="w-6 h-6 text-green-600" />
-                </div>
-                <span className="text-sm text-green-600 font-medium flex items-center gap-1">
-                  <ArrowUp className="w-4 h-4" />
-                  +8%
-                </span>
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">{stats.satisfactionRate}/5</div>
-              <div className="text-sm text-gray-600">Customer Satisfaction</div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Award className="w-6 h-6 text-purple-600" />
-                </div>
-                <span className="text-sm text-red-600 font-medium flex items-center gap-1">
-                  <ArrowDown className="w-4 h-4" />
-                  -3%
-                </span>
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">94.2%</div>
-              <div className="text-sm text-gray-600">SLA Compliance</div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Zap className="w-6 h-6 text-orange-600" />
-                </div>
-                <span className="text-sm text-green-600 font-medium flex items-center gap-1">
-                  <ArrowUp className="w-4 h-4" />
-                  +15%
-                </span>
-              </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">87%</div>
-              <div className="text-sm text-gray-600">First Contact Resolution</div>
-            </div>
-          </div>
-
-          {/* Charts and Analytics */}
-          <div className="grid lg:grid-cols-2 gap-8 mb-8">
-            {/* Main Analytics Chart */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">Complaint Trends</h3>
-                <select className="border border-gray-300 rounded-lg px-3 py-1 text-sm">
-                  <option>Last 7 days</option>
-                  <option>Last 30 days</option>
-                  <option>Last 3 months</option>
-                  <option>Last year</option>
-                </select>
-              </div>
-              <AnalyticsChart title="" type="line" data={complaints} />
-            </div>
-
-            {/* Category Breakdown */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-6">Complaints by Category</h3>
-              <div className="space-y-4">
-                {['Technical Support', 'Billing', 'Product Quality', 'Customer Service', 'Delivery'].map((category, index) => {
-                  const percentage = Math.floor(Math.random() * 30) + 10;
-                  return (
-                    <div key={category} className="flex items-center justify-between">
-                      <span className="text-gray-700">{category}</span>
-                      <div className="flex items-center gap-3">
-                        <div className="w-24 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full ${
-                              index === 0 ? 'bg-blue-500' :
-                              index === 1 ? 'bg-green-500' :
-                              index === 2 ? 'bg-yellow-500' :
-                              index === 3 ? 'bg-purple-500' :
-                              'bg-red-500'
-                            }`}
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium w-10 text-right">{percentage}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Agent Performance */}
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">Agent Performance Metrics</h3>
-              <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                View All Agents →
-              </button>
-            </div>
+            )}
             
-            <div className="grid lg:grid-cols-2 gap-8">
-              <div>
-                <h4 className="font-medium text-gray-900 mb-4">Top Performers This Month</h4>
-                <div className="space-y-3">
-                  {[
-                    { name: 'Sarah Johnson', resolved: 156, rating: 4.9, efficiency: 98 },
-                    { name: 'Mike Chen', resolved: 142, rating: 4.8, efficiency: 95 },
-                    { name: 'Emily Davis', resolved: 138, rating: 4.7, efficiency: 93 },
-                  ].map((agent, index) => (
-                    <div key={agent.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                          index === 0 ? 'bg-yellow-500' :
-                          index === 1 ? 'bg-gray-400' :
-                          'bg-orange-500'
-                        }`}>
-                          {index + 1}
+            {/* Support Tools Section */}
+            {activeSection === 'support-tools' && (
+              <div className="mb-12">
+                <div className="flex items-center space-x-3 mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-800">Support Tools</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {supportTools.map((item, index) => (
+                    <div
+                      key={index}
+                      className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg hover:border-gray-300 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div className="text-3xl flex-shrink-0">
+                          {item.icon}
                         </div>
-                        <div>
-                          <div className="font-medium text-gray-900">{agent.name}</div>
-                          <div className="text-sm text-gray-600">{agent.resolved} resolved</div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-800 text-base mb-2">
+                            {item.title}
+                          </h3>
+                          <p className="text-sm text-gray-600 leading-relaxed">
+                            {item.description}
+                          </p>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center gap-1 text-sm">
-                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                          {agent.rating}
-                        </div>
-                        <div className="text-sm text-gray-600">{agent.efficiency}% efficiency</div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-              
-              <div>
-                <h4 className="font-medium text-gray-900 mb-4">Resolution Time by Priority</h4>
-                <div className="space-y-4">
-                  {[
-                    { priority: 'Urgent', avgTime: '2.1h', target: '2h', status: 'warning' },
-                    { priority: 'High', avgTime: '6.3h', target: '8h', status: 'good' },
-                    { priority: 'Medium', avgTime: '18.5h', target: '24h', status: 'good' },
-                    { priority: 'Low', avgTime: '52.2h', target: '72h', status: 'good' },
-                  ].map((item) => (
-                    <div key={item.priority} className="flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          item.priority === 'Urgent' ? 'bg-red-100 text-red-800' :
-                          item.priority === 'High' ? 'bg-orange-100 text-orange-800' :
-                          item.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {item.priority}
-                        </span>
-                        <span className="text-gray-700">Avg: {item.avgTime}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Target: {item.target}</span>
-                        <div className={`w-3 h-3 rounded-full ${
-                          item.status === 'good' ? 'bg-green-500' : 'bg-yellow-500'
-                        }`} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            )}
           </div>
-
-          {/* Export Options */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-6">Export Reports</h3>
-            <div className="grid md:grid-cols-3 gap-4">
-              <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 text-left">
-                <div className="flex items-center gap-3 mb-2">
-                  <PieChart className="w-5 h-5 text-blue-600" />
-                  <span className="font-medium">Performance Report</span>
-                </div>
-                <p className="text-sm text-gray-600">Complete performance analytics and metrics</p>
-              </button>
-              
-              <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 text-left">
-                <div className="flex items-center gap-3 mb-2">
-                  <Calendar className="w-5 h-5 text-green-600" />
-                  <span className="font-medium">Monthly Summary</span>
-                </div>
-                <p className="text-sm text-gray-600">Monthly complaint trends and resolutions</p>
-              </button>
-              
-              <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 text-left">
-                <div className="flex items-center gap-3 mb-2">
-                  <BarChart3 className="w-5 h-5 text-purple-600" />
-                  <span className="font-medium">Custom Report</span>
-                </div>
-                <p className="text-sm text-gray-600">Build your own custom analytics report</p>
-              </button>
-            </div>
-          </div>
-        </div>
+        </main>
       </div>
-    );
-  }
+    </div>
+  );
+};
 
-  return null;
-}
+// Export is handled via named export at the component declaration

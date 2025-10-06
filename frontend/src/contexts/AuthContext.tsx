@@ -99,14 +99,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role: "user" | "agent" | "admin" | "analytics" = "user"
   ): Promise<boolean> => {
     try {
+      console.log("Registering user with:", { name, email, role });
+      
       const response = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password, role }),
       });
 
-      if (!response.ok) return false;
       const data = await response.json();
+      
+      if (!response.ok) {
+        console.error("Registration failed:", data);
+        throw new Error(data.message || "Registration failed");
+      }
+      
       const userData: User = {
         id: data.user.id,
         firstName: data.user.firstName || data.user.name.split(" ")[0],

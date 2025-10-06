@@ -23,16 +23,23 @@ export function LoginForm() {
     setError('');
 
     try {
+      console.log(`Submitting form with role: ${formData.role}`);
+      
       const success = isLogin
         ? await login(formData.email, formData.password)
         : await register(formData.name, formData.email, formData.password, formData.role);
 
       if (!success) {
-        setError(isLogin ? 'Invalid email or password' : 'Registration failed');
+        setError(isLogin ? 'Invalid email or password' : `Registration failed. Please check if your email is already registered or if the password meets complexity requirements.`);
       }
     } catch (err) {
       console.error('Auth error:', err);
-      setError('An error occurred. Please try again.');
+      // Show the specific error message if available
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
