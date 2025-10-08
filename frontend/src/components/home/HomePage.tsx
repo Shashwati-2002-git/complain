@@ -378,9 +378,9 @@ export function HomePage() {
           <div className="grid md:grid-cols-3 gap-8">
             {/* Resource Card 1 - Customer Service Report */}
             <div className="group cursor-pointer">
-              <div className="bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl p-8 mb-6 hover:shadow-xl transition-all duration-300">
+              <div className="bg-gradient-to-br from-orange-200 to-white-100 rounded-2xl p-8 mb-6 hover:shadow-xl transition-all duration-300">
                 <img
-                  src="/ChatGPT Image Oct 3, 2025, 10_44_18 PM.png"
+                  src="exploreinsight.png"
                   alt="QuickFix Customer Service Benchmark Report 2025"
                   className="w-full h-auto rounded-lg"
                 />
@@ -398,9 +398,9 @@ export function HomePage() {
 
             {/* Resource Card 2 - Forrester TEI Study */}
             <div className="group cursor-pointer">
-              <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl p-8 mb-6 hover:shadow-xl transition-all duration-300">
+              <div className="bg-gradient-to-br from-orange-200 to--100 rounded-2xl p-8 mb-6 hover:shadow-xl transition-all duration-300">
                 <img
-                  src="/ChatGPT Image Oct 3, 2025, 11_00_54 PM.png"
+                  src="exploreinsight2.png"
                   alt="The Total Economic Impact of QuickFix"
                   className="w-full h-auto rounded-lg"
                 />
@@ -418,9 +418,9 @@ export function HomePage() {
 
             {/* Resource Card 3 - CX Priorities Report */}
             <div className="group cursor-pointer">
-              <div className="bg-gradient-to-br from-blue-100 to-cyan-100 rounded-2xl p-8 mb-6 hover:shadow-xl transition-all duration-300">
+              <div className="bg-gradient-to-br from-orange-200 to-white-100 rounded-2xl p-8 mb-6 hover:shadow-xl transition-all duration-300">
                 <img
-                  src="/ChatGPT Image Oct 3, 2025, 11_00_54 PM.png"
+                  src="exploreinsight.png"
                   alt="The Total Economic Impact of QuickFix"
                   className="w-full h-auto rounded-lg"
                 />
