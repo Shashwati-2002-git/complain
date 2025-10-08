@@ -27,6 +27,12 @@ module.exports = {
   // AI Service configuration
   AI_SERVICE_URL: process.env.AI_SERVICE_URL || 'http://localhost:5001',
   
+  // IBM Watson configuration
+  WATSON_API_KEY: process.env.WATSON_API_KEY,
+  WATSON_REGION: process.env.WATSON_REGION || 'au-syd',
+  WATSON_SERVICE_INSTANCE_ID: process.env.WATSON_SERVICE_INSTANCE_ID,
+  WATSON_ASSISTANT_ID: process.env.WATSON_ASSISTANT_ID,
+  
   // OAuth configuration
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,

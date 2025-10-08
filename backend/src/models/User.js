@@ -11,6 +11,16 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'admin', 'agent', 'analytics'], 
       default: 'user' 
     },
+    // Email verification
+    isVerified: { type: Boolean, default: false },
+    otp: { type: String },
+    otpExpiry: { type: Date },
+    // Agent availability status
+    availability: {
+      type: String,
+      enum: ['available', 'busy', 'offline'],
+      default: 'available',
+    },
     // Google OAuth fields
     isGoogleUser: { type: Boolean, default: false },
     googleId: { type: String },

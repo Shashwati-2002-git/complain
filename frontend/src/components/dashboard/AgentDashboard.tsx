@@ -3,8 +3,10 @@ import {
   Clock, CheckCircle, Bell, User, MessageCircle, 
   Search, Calendar, X, Shield, Home, 
   Inbox, HelpCircle, Menu, Download,
-  Bot, Star, AlertCircle, Eye, LogOut, Settings, ChevronDown
+  Bot, Star, AlertCircle, Eye, LogOut, Settings, ChevronDown,
+  Activity, UserCheck, UserX
 } from 'lucide-react';
+import { agentService } from '../../services/agentService';
 import { Notifications } from '../notifications/Notifications';
 import { useAuth } from '../../hooks/useAuth';
 import { useComplaints, Complaint } from '../../contexts/ComplaintContext';
@@ -56,7 +58,7 @@ export function AgentDashboard() {
     department: 'Support',
     role: user?.role || 'agent',
     joinDate: '2024-01-15',
-    availability: 'Available'
+    availability: 'available'
   });
 
   // Update agent profile when user changes
@@ -95,6 +97,25 @@ export function AgentDashboard() {
           console.log(`Joined complaint room: ${complaint.id}`);
         });
       }
+      
+      // Refresh agent availability status based on active tickets
+      const refreshAvailability = async () => {
+        try {
+          if (user?.id) {
+            const result = await agentService.refreshAvailability(user.id);
+            if (result.data) {
+              setAgentProfile(prev => ({
+                ...prev,
+                availability: result.data.availability
+              }));
+            }
+          }
+        } catch (error) {
+          console.error('Error refreshing agent availability:', error);
+        }
+      };
+      
+      refreshAvailability();
     }
     setLoading(false);
   }, [complaints, user, isConnected, joinComplaintRoom]);
@@ -169,6 +190,31 @@ export function AgentDashboard() {
 
   const handleEscalate = async (complaintId: string) => {
     await handleStatusUpdate(complaintId, 'Escalated');
+  };
+
+  // Function to update agent availability
+  const updateAvailability = async (status: 'available' | 'busy' | 'offline') => {
+    if (!user?.id) return;
+    
+    try {
+      const result = await agentService.updateAvailability(user.id, status);
+      
+      if (result.data) {
+        setAgentProfile(prev => ({
+          ...prev,
+          availability: result.data.availability
+        }));
+        
+        // Inform the user of the status change
+        alert(`Your availability status has been updated to ${status}`);
+      } else if (result.error) {
+        console.error('Error updating availability:', result.error);
+        alert(`Failed to update availability: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating agent availability:', error);
+      alert('An unexpected error occurred while updating your availability');
+    }
   };
 
   const exportToCSV = () => {
@@ -293,6 +339,36 @@ export function AgentDashboard() {
           </div>
           
           <div className="flex items-center gap-4">
+            {/* Agent Availability Controls */}
+            <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+                <button 
+                  onClick={() => updateAvailability('available')}
+                  className={`px-2 py-1 rounded flex items-center gap-1 ${agentProfile.availability === 'available' ? 'bg-green-500 text-white' : 'hover:bg-gray-200'}`}
+                  title="Set as Available"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>Available</span>
+                </button>
+                <button 
+                  onClick={() => updateAvailability('busy')}
+                  className={`px-2 py-1 rounded flex items-center gap-1 ${agentProfile.availability === 'busy' ? 'bg-orange-500 text-white' : 'hover:bg-gray-200'}`}
+                  title="Set as Busy"
+                >
+                  <Activity className="w-4 h-4" />
+                  <span>Busy</span>
+                </button>
+                <button 
+                  onClick={() => updateAvailability('offline')}
+                  className={`px-2 py-1 rounded flex items-center gap-1 ${agentProfile.availability === 'offline' ? 'bg-gray-500 text-white' : 'hover:bg-gray-200'}`}
+                  title="Set as Offline"
+                >
+                  <UserX className="w-4 h-4" />
+                  <span>Offline</span>
+                </button>
+              </div>
+            </div>
+            
             {/* Socket Connection Status Indicator with debug info */}
             <div className="flex items-center gap-1.5 text-sm group relative">
               <div className={`w-2.5 h-2.5 rounded-full ${getConnectionStatusColor(isConnected)}`}></div>

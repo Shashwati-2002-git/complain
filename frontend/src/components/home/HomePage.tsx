@@ -1,6 +1,6 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Users, MessageSquare, BarChart3, Shield, CheckCircle, Star, Play } from 'lucide-react';
+import { ArrowRight, Users, MessageSquare, BarChart3, Shield, CheckCircle, Play } from 'lucide-react';
+import TestimonialCarousel from './TestimonialCarousel';
 
 export function HomePage() {
   return (
@@ -22,7 +22,6 @@ export function HomePage() {
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-gray-600 hover:text-gray-900 font-medium">Features</a>
               <a href="#how-it-works" className="text-gray-600 hover:text-gray-900 font-medium">How It Works</a>
-              <a href="#reviews" className="text-gray-600 hover:text-gray-900 font-medium">Reviews</a>
               <a href="#about" className="text-gray-600 hover:text-gray-900 font-medium">About us</a>
               <Link
                 to="/login"
@@ -214,23 +213,57 @@ export function HomePage() {
             </Link>
           </div>
 
-          {/* Stats */}
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold text-orange-500 mb-2">83%</div>
-              <div className="text-gray-600">Reduction in response times</div>
+          {/* Freddy AI Video */}
+          <div className="max-w-4xl mx-auto mb-16">
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+              <video 
+                className="w-full h-auto" 
+                controls 
+                autoPlay 
+                loop 
+                muted
+                poster="/videos/freddy-ai-poster.jpg"
+              >
+                <source 
+                  src="https://dam.freshworks.com/m/3f4f0cf65ec45bed/original/AI-Agent_X2-50.webm" 
+                  type="video/webm" 
+                />
+                Your browser does not support the video tag.
+              </video>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none rounded-2xl"></div>
             </div>
-            <div>
-              <div className="text-4xl font-bold text-orange-500 mb-2">&lt;2 mins</div>
-              <div className="text-gray-600">Average conversational resolution time</div>
+            <p className="text-center text-gray-500 mt-4">Freddy AI agents handling customer queries in real-time</p>
+          </div>
+
+          {/* Stats with colored cards like image */}
+          <div className="mt-12 mb-4">
+            <h3 className="text-2xl font-bold text-blue-600 text-center mb-6">
+              Industry-leading results with QuickFix
+            </h3>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* 83% Card - Mint Green */}
+            <div className="bg-green-100 rounded-xl p-8 flex flex-col justify-center">
+              <div className="text-6xl font-bold text-gray-900 mb-4">83%</div>
+              <div className="text-lg text-gray-700">Reduction in response times</div>
             </div>
-            <div>
-              <div className="text-4xl font-bold text-orange-500 mb-2">97%</div>
-              <div className="text-gray-600">Omnichannel first contact resolution rate</div>
+            
+            {/* <2 mins Card - Light Purple */}
+            <div className="bg-purple-50 rounded-xl p-8 flex flex-col justify-center">
+              <div className="text-6xl font-bold text-gray-900 mb-4">&lt;2 mins</div>
+              <div className="text-lg text-gray-700">Average conversational resolution time</div>
             </div>
-            <div>
-              <div className="text-4xl font-bold text-orange-500 mb-2">60%</div>
-              <div className="text-gray-600">Improved agent productivity with Freddy AI Copilot</div>
+            
+            {/* 97% Card - Cream */}
+            <div className="bg-yellow-50 rounded-xl p-8 flex flex-col justify-center">
+              <div className="text-6xl font-bold text-gray-900 mb-4">97%</div>
+              <div className="text-lg text-gray-700">Omnichannel first contact resolution rate</div>
+            </div>
+            
+            {/* 60% Card - Light Pink */}
+            <div className="bg-red-50 rounded-xl p-8 flex flex-col justify-center">
+              <div className="text-6xl font-bold text-gray-900 mb-4">60%</div>
+              <div className="text-lg text-gray-700">Improved agent productivity with Freddy AI Copilot</div>
             </div>
           </div>
         </div>
@@ -243,9 +276,30 @@ export function HomePage() {
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
               The full customer service experience
             </h2>
-            <p className="text-xl text-gray-600 max-w-4xl mx-auto">
+            <p className="text-xl text-gray-600 max-w-4xl mx-auto mb-10">
               Everything you need to support customers and empower teams—all in one place, available out of the box
             </p>
+            
+            {/* Customer Experience Video */}
+            <div className="max-w-4xl mx-auto mb-16">
+              <div className="relative rounded-2xl overflow-hidden shadow-xl">
+                <video 
+                  className="w-full h-auto" 
+                  controls 
+                  autoPlay 
+                  loop 
+                  muted
+                >
+                  <source 
+                    src="https://dam.freshworks.com/m/5985bfde388a455d/original/Resolution-AI-Assist_Omni_X2-50.webm" 
+                    type="video/webm" 
+                  />
+                  Your browser does not support the video tag.
+                </video>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none rounded-2xl"></div>
+              </div>
+              <p className="text-center text-gray-500 mt-4">See how AI-assisted resolutions enhance the customer experience</p>
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -283,66 +337,28 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section id="reviews" className="py-24 bg-gray-50">
+      {/* Testimonials - Auto-scrolling carousel */}
+      <section id="reviews" className="py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
               Join 73,000+ companies uncomplicating customer service
             </h2>
-            <Link
-              to="/login"
-              className="inline-flex items-center gap-2 text-orange-500 font-semibold hover:text-orange-600"
-            >
-              View all customer stories <ArrowRight className="w-4 h-4" />
-            </Link>
+            <p className="text-xl text-gray-600 max-w-4xl mx-auto mb-8">
+              Leaders across industries are transforming customer experiences with QuickFix
+            </p>
           </div>
 
-          <div className="bg-white p-12 rounded-2xl shadow-lg max-w-4xl mx-auto text-center">
-            <div className="flex justify-center mb-6">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-              ))}
-            </div>
-            <blockquote className="text-xl text-gray-700 mb-8 italic">
-              "I want the ability to get one view of how we support our customers—not just the 
-              number of tickets, but any information on how we interact with them. You've got to 
-              bring everything into one platform. QuickFix allows us to do that."
-            </blockquote>
-            <div className="text-gray-900 font-semibold">Tony Barbone</div>
-            <div className="text-gray-600">Chief Revenue Officer</div>
-          </div>
-        </div>
-      </section>
-
-      {/* Awards Section */}
-      <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="mb-8">
-            <span className="bg-orange-100 text-orange-800 text-sm font-semibold px-3 py-1 rounded-full">
-              TOP-RATED
-            </span>
-          </div>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-            The experts agree
-          </h2>
-          <p className="text-xl text-gray-600 mb-12 max-w-3xl mx-auto">
-            Recognized by G2 and TrustRadius for delivering modern, AI-powered customer service that drives results.
-          </p>
+          {/* Auto-scrolling Testimonial Carousel Component */}
+          <TestimonialCarousel autoScrollInterval={5000} />
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center opacity-60">
-            <div className="bg-gray-100 h-24 rounded-lg flex items-center justify-center">
-              <span className="text-gray-500 font-semibold">G2 Leader</span>
-            </div>
-            <div className="bg-gray-100 h-24 rounded-lg flex items-center justify-center">
-              <span className="text-gray-500 font-semibold">TrustRadius</span>
-            </div>
-            <div className="bg-gray-100 h-24 rounded-lg flex items-center justify-center">
-              <span className="text-gray-500 font-semibold">Capterra</span>
-            </div>
-            <div className="bg-gray-100 h-24 rounded-lg flex items-center justify-center">
-              <span className="text-gray-500 font-semibold">GetApp</span>
-            </div>
+          <div className="text-center mt-12">
+            <Link
+              to="/customers"
+              className="inline-flex items-center gap-2 text-orange-500 font-semibold hover:text-orange-600 text-lg"
+            >
+              View all customer stories <ArrowRight className="w-5 h-5" />
+            </Link>
           </div>
         </div>
       </section>

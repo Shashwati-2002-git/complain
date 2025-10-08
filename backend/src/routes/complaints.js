@@ -116,7 +116,7 @@ router.post('/', authenticate, asyncHandler(async (req, res) => {
   slaTarget.setHours(slaTarget.getHours() + slaHours[aiAnalysis.priority]);
 
   const complaint = new Complaint({
-    userId: req.user._id,
+    user: req.user._id, // Updated to match the schema field name
     title,
     description,
     category: category || aiAnalysis.category,
@@ -133,16 +133,39 @@ router.post('/', authenticate, asyncHandler(async (req, res) => {
     },
     updates: [{
       message: 'Complaint has been created and classified automatically.',
-      author: 'System',
-      authorId: req.user._id,
-      timestamp: new Date(),
-      type: 'status_change',
+      updatedBy: req.user._id, // Updated to match the schema field
+      updateType: 'status_change',
+      createdAt: new Date(),
       isInternal: false
     }]
   });
 
+  // Save the complaint first to get its ID
   await complaint.save();
-  res.status(201).json(complaint);
+  
+  // Import the ticket assignment service
+  const { autoAssignTicket } = await import('../services/ticketAssignmentService.js');
+  
+  try {
+    // Attempt to auto-assign the ticket to an available agent
+    const { assignedAgent } = await autoAssignTicket(complaint._id);
+    
+    // If an agent was assigned, update the response
+    if (assignedAgent) {
+      console.log(`Complaint ${complaint.complaintId} assigned to ${assignedAgent.name}`);
+    } else {
+      console.log(`No available agent to handle complaint ${complaint.complaintId}`);
+    }
+  } catch (err) {
+    console.error('Error assigning ticket:', err);
+    // Continue even if auto-assignment fails
+  }
+  
+  // Get updated complaint after assignment
+  const updatedComplaint = await Complaint.findById(complaint._id)
+    .populate('assignedTo', 'name email');
+  
+  res.status(201).json(updatedComplaint);
 }));
 
 // Update complaint status
@@ -180,20 +203,40 @@ router.patch('/:id/status', authenticate, authorize('agent', 'admin'), asyncHand
   complaint.updates.push(updateRecord);
 
   // Calculate resolution time if resolved
-  if (status === 'Resolved' && !complaint.metrics.resolutionTime) {
-    complaint.metrics.resolutionTime = 
-      (new Date().getTime() - complaint.createdAt.getTime()) / (1000 * 60 * 60); // hours
+  if (status === 'Resolved') {
+    // Store resolution details
+    complaint.resolution = {
+      description: message || 'Complaint resolved',
+      resolvedBy: req.user._id,
+      resolvedAt: new Date()
+    };
+    
+    // If this agent resolved it, check if they should be marked available again
+    if (complaint.assignedTo && complaint.assignedTo.toString() === req.user._id.toString()) {
+      // Import the agent service
+      const { refreshAgentAvailability } = await import('../services/agentService.js');
+      
+      try {
+        // This will check if agent has any remaining active complaints
+        // and update their availability accordingly
+        await refreshAgentAvailability(req.user._id);
+      } catch (err) {
+        console.error('Error updating agent availability:', err);
+      }
+    }
   }
 
   await complaint.save();
 
   // Emit socket event for real-time updates
   const io = req.app.get('io');
-  io.emit('complaintUpdated', {
-    complaintId: complaint._id,
-    status: complaint.status,
-    updatedBy: req.user._id
-  });
+  if (io) {
+    io.emit('complaintUpdated', {
+      complaintId: complaint._id,
+      status: complaint.status,
+      updatedBy: req.user._id
+    });
+  }
 
   res.json(complaint);
 }));

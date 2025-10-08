@@ -110,6 +110,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [validateSession]);
 
   const isAuthenticated = !!user;
+  
+  // Added state for OTP verification flow
+  const [pendingVerification, setPendingVerification] = useState<{
+    email: string;
+    userId: string | null;
+  } | null>(null);
+  
+  // Check if OTP verification is pending
+  const isVerificationPending = !!pendingVerification;
 
   // Login
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -120,8 +129,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
 
-      if (!response.ok) return false;
       const data = await response.json();
+      
+      // If the user is not verified and needs OTP verification
+      if (response.status === 401 && data.requiresVerification) {
+        // Set pending verification state
+        setPendingVerification({
+          email,
+          userId: data.userId || null,
+        });
+        return false; // Don't proceed with login yet
+      }
+
+      if (!response.ok) return false;
+      
       const userData: User = {
         id: data.user.id,
         firstName: data.user.firstName || data.user.name.split(" ")[0],
@@ -163,6 +184,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         console.error("Registration failed:", data);
         throw new Error(data.message || "Registration failed");
+      }
+      
+      // Check if verification is required
+      if (data.requiresVerification) {
+        // Set the pending verification state
+        setPendingVerification({
+          email,
+          userId: data.user?.id || null,
+        });
+        return false; // Return false to indicate registration is pending verification
       }
       
       const userData: User = {
@@ -340,6 +371,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("user");
     setUser(null);
   };
+  
+  // Verify OTP for email verification
+  const verifyOTP = async (email: string, otp: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp }),
+      });
+
+      if (!response.ok) return false;
+      const data = await response.json();
+
+      const userData: User = {
+        id: data.user.id,
+        firstName: data.user.firstName || data.user.name.split(" ")[0],
+        lastName: data.user.lastName || data.user.name.split(" ").slice(1).join(" ") || "",
+        name: data.user.name,
+        email: data.user.email,
+        role: data.user.role,
+      };
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(userData);
+      
+      // Clear the pending verification state
+      setPendingVerification(null);
+
+      return true;
+    } catch (error) {
+      console.error("OTP verification error:", error);
+      return false;
+    }
+  };
+
+  // Resend OTP
+  const resendOTP = async (email: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/resend-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error("Resend OTP error:", error);
+      return false;
+    }
+  };
+
+  // Cancel verification flow
+  const cancelVerification = () => {
+    setPendingVerification(null);
+  };
 
   return (
     <AuthContext.Provider
@@ -356,6 +443,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginWithFacebook,
         facebookSignupWithRole,
         validateSession,
+        // OTP verification related props
+        pendingVerification,
+        verifyOTP,
+        resendOTP,
+        cancelVerification,
       }}
     >
       {children}

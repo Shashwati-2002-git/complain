@@ -11,7 +11,9 @@ import {
   processChatForComplaint,
   chatWithWatson,
   generateComplaintFromWatson,
-  refreshToken
+  refreshToken,
+  verifyOTP,
+  resendOTP
 } from "../controllers/authController.js";
 
 const router = express.Router();
@@ -20,6 +22,10 @@ const router = express.Router();
 router.post("/signup", registerUser);
 router.post("/login", loginUser);
 router.post("/refresh", refreshToken);
+
+// OTP verification
+router.post("/verify-otp", verifyOTP);
+router.post("/resend-otp", resendOTP);
 
 // Google OAuth login
 router.post("/google", googleLogin);

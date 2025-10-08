@@ -19,8 +19,16 @@ export const autoAssignTicket = async (complaintId) => {
       throw new Error(`Complaint ${complaintId} is already assigned to an agent`);
     }
     
-    // Find available agents (those with role='agent' and fewer than 5 active complaints)
-    const agents = await User.find({ role: 'agent' }).lean();
+    // First try to find agents who are marked as available
+    const availableAgents = await User.find({ 
+      role: 'agent',
+      availability: 'available'
+    }).lean();
+    
+    // If no explicitly available agents, fall back to any agent
+    const agents = availableAgents.length > 0 ? 
+      availableAgents : 
+      await User.find({ role: 'agent' }).lean();
     
     if (!agents || agents.length === 0) {
       console.log('No agents available in the system');
@@ -40,12 +48,21 @@ export const autoAssignTicket = async (complaintId) => {
           name: agent.name,
           activeTickets: activeTicketCount,
           email: agent.email,
+          availability: agent.availability
         };
       })
     );
     
-    // Find agent with the lowest workload
-    const sortedAgents = agentLoads.sort((a, b) => a.activeTickets - b.activeTickets);
+    // Find agent with the lowest workload among available agents
+    const sortedAgents = agentLoads
+      .sort((a, b) => {
+        // First sort by availability ('available' agents first)
+        if (a.availability === 'available' && b.availability !== 'available') return -1;
+        if (a.availability !== 'available' && b.availability === 'available') return 1;
+        // Then by active ticket count
+        return a.activeTickets - b.activeTickets;
+      });
+      
     const leastBusyAgent = sortedAgents[0];
     
     // If the agent has fewer than MAX_TICKETS_PER_AGENT, assign the ticket
@@ -64,6 +81,11 @@ export const autoAssignTicket = async (complaintId) => {
       });
       
       await complaint.save();
+      
+      // Update agent availability to busy
+      await User.findByIdAndUpdate(leastBusyAgent.agentId, {
+        availability: 'busy'
+      });
       
       // Create notification for the agent
       await createNotification(

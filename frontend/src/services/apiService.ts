@@ -1,4 +1,6 @@
 // ApiService.ts - API Service for frontend-backend communication
+import type { Agent } from './agentService';  // Import the Agent interface
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 console.log(`API Service initialized with base URL: ${API_BASE_URL}`);
@@ -203,6 +205,16 @@ class ApiService {
   async markAllNotificationsAsRead() { return this.request('/notifications/read-all', { method: 'PATCH' }); }
   async getNotificationPreferences() { return this.request('/notifications/preferences'); }
   async updateNotificationPreferences(preferences: Record<string, unknown>) { return this.request('/notifications/preferences', { method: 'PATCH', body: JSON.stringify(preferences) }); }
+
+  // --------------------- Agents ---------------------
+  async getAllAgents() { return this.request<Agent[]>('/agents'); }
+  async getAvailableAgents() { return this.request<Agent[]>('/agents/available'); }
+  async updateAgentAvailability(agentId: string, status: 'available' | 'busy' | 'offline') { 
+    return this.request<Agent>(`/agents/${agentId}/availability`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  }
+  async refreshAgentAvailability(agentId: string) { 
+    return this.request<Agent>(`/agents/${agentId}/refresh-availability`, { method: 'POST' });
+  }
 }
 
 export const apiService = new ApiService();

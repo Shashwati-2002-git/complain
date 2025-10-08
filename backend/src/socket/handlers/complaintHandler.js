@@ -6,6 +6,7 @@ import { sendNotification } from './notificationHandler.js';
 import { getConnectedUsers } from './connectionHandler.js';
 import { createNotification } from '../../services/notificationService.js';
 import { autoAssignTicket, manualAssignTicket } from '../../services/ticketAssignmentService.js';
+import { User } from '../../models/User.js';
 
 /**
  * Initialize the complaint handler
@@ -27,7 +28,8 @@ export const initComplaintHandler = (io) => {
         // Users can only view their own complaints unless they're agents or admins
         const isOwner = complaint.userId?.toString() === socket.user._id.toString();
         const isAgentOrAdmin = ['agent', 'admin'].includes(socket.user.role);
-        
+        const isAssignedAgent = socket.user.role === 'agent' && 
+                               complaint.agentId?.toString() === socket.user._id.toString();
         if (!isOwner && !isAgentOrAdmin) {
           socket.emit('error', { message: 'Unauthorized to access this complaint' });
           return;
@@ -53,6 +55,48 @@ export const initComplaintHandler = (io) => {
       socket.emit('left_complaint', { complaintId });
     });
     
+    // Handle new complaint created
+    socket.on('new_complaint_created', async ({ complaintId }) => {
+      try {
+        // Fetch the newly created complaint with populated fields
+        const complaint = await Complaint.findById(complaintId)
+          .populate('userId', 'name email')
+          .populate('agentId', 'name email role')
+          .lean();
+          
+        if (!complaint) {
+          console.error(`New complaint ${complaintId} not found in database`);
+          return;
+        }
+        
+        // Emit to all admins
+        socket.broadcast.to('admin').emit('new_complaint', complaint);
+        
+        // If assigned to an agent, emit to that specific agent
+        if (complaint.agentId) {
+          socket.broadcast.to(`agent:${complaint.agentId._id}`).emit('new_complaint', complaint);
+        } else {
+          // If not assigned, broadcast to all agents
+          socket.broadcast.to('agent').emit('new_complaint', complaint);
+        }
+        
+        // Create notification for admins and agents
+        await createNotification({
+          title: 'New Complaint Filed',
+          message: `A new complaint "${complaint.title}" has been filed`,
+          type: 'complaint',
+          targetUsers: ['admin', 'agent'],
+          referenceId: complaint._id,
+          data: { complaintId: complaint._id }
+        });
+        
+        // Broadcast to dashboards to update stats
+        socket.broadcast.to('admin').emit('dashboard_stats_update', { type: 'new_complaint' });
+      } catch (error) {
+        console.error('Socket error handling new complaint:', error);
+      }
+    });
+
     // Update complaint status
     socket.on('update_complaint_status', async ({ complaintId, status, note }) => {
       try {
@@ -62,7 +106,9 @@ export const initComplaintHandler = (io) => {
           return;
         }
         
-        const complaint = await Complaint.findById(complaintId);
+        const complaint = await Complaint.findById(complaintId)
+          .populate('userId', 'name email')
+          .populate('agentId', 'name email role');
         
         if (!complaint) {
           socket.emit('error', { message: 'Complaint not found' });
@@ -96,6 +142,154 @@ export const initComplaintHandler = (io) => {
           updatedAt: new Date(),
           note
         });
+        
+        // Notify the user who owns the complaint
+        if (complaint.userId) {
+          socket.broadcast.to(`user:${complaint.userId._id}`).emit('complaint_status_update', {
+            complaintId,
+            status,
+            updatedAt: new Date(),
+            updatedBy: socket.user._id
+          });
+          
+          // Create notification for the user
+          await createNotification({
+            title: 'Complaint Status Updated',
+            message: `Your complaint "${complaint.title}" is now ${status}`,
+            type: 'status_update',
+            targetUsers: [complaint.userId._id],
+            referenceId: complaint._id,
+            data: { complaintId, status }
+          });
+        }
+        
+        // Emit to admins for dashboard updates
+        socket.broadcast.to('admin').emit('complaint_status_update', {
+          complaintId,
+          status,
+          updatedAt: new Date(),
+          updatedBy: socket.user._id
+        });
+        
+        // If assigned to an agent, emit to that agent (unless they made the update)
+        if (complaint.agentId && complaint.agentId._id.toString() !== socket.user._id.toString()) {
+          socket.broadcast.to(`agent:${complaint.agentId._id}`).emit('complaint_status_update', {
+            complaintId,
+            status,
+            updatedAt: new Date(),
+            updatedBy: socket.user._id
+          });
+        }
+        
+        // Broadcast to dashboards to update stats
+        io.to('admin').emit('dashboard_stats_update', { type: 'status_update' });
+        
+        // Update agent workload data for admin dashboard
+        const agents = await User.find({ role: 'agent' })
+          .select('name email activeComplaints')
+          .lean();
+          
+        io.to('admin').emit('agent_status_update', agents);
+      } catch (error) {
+        console.error('Error updating complaint status:', error);
+        socket.emit('error', { message: 'Error updating complaint status' });
+      }
+    });
+    
+    // Handle complaint assignment
+    socket.on('assign_complaint', async ({ complaintId, agentId }) => {
+      try {
+        // Security check - only admins can assign complaints
+        if (socket.user.role !== 'admin') {
+          socket.emit('error', { message: 'Unauthorized to assign complaints' });
+          return;
+        }
+        
+        const complaint = await Complaint.findById(complaintId)
+          .populate('userId', 'name email')
+          .populate('agentId', 'name email role');
+        
+        if (!complaint) {
+          socket.emit('error', { message: 'Complaint not found' });
+          return;
+        }
+        
+        // Get agent info
+        const agent = await User.findById(agentId).select('name email').lean();
+        if (!agent) {
+          socket.emit('error', { message: 'Agent not found' });
+          return;
+        }
+        
+        // Update the complaint with the new agent
+        const previousAgentId = complaint.agentId?._id;
+        complaint.agentId = agentId;
+        complaint.assignmentHistory.push({
+          agentId,
+          assignedBy: socket.user._id,
+          assignedAt: new Date()
+        });
+        
+        await complaint.save();
+        
+        // Emit to the assigned agent
+        socket.broadcast.to(`agent:${agentId}`).emit('complaint_assigned', {
+          complaint,
+          assignedBy: socket.user._id
+        });
+        
+        // Emit to the user who owns the complaint
+        if (complaint.userId) {
+          socket.broadcast.to(`user:${complaint.userId._id}`).emit('complaint_assigned', {
+            complaintId,
+            agentName: agent.name,
+            assignedAt: new Date()
+          });
+          
+          // Create notification for the user
+          await createNotification({
+            title: 'Agent Assigned',
+            message: `Agent ${agent.name} has been assigned to your complaint`,
+            type: 'assignment',
+            targetUsers: [complaint.userId._id],
+            referenceId: complaint._id,
+            data: { complaintId, agentId }
+          });
+        }
+        
+        // Create notification for the agent
+        await createNotification({
+          title: 'New Complaint Assigned',
+          message: `Complaint "${complaint.title}" has been assigned to you`,
+          type: 'assignment',
+          targetUsers: [agentId],
+          referenceId: complaint._id,
+          data: { complaintId }
+        });
+        
+        // If there was a previous agent, notify them they're no longer assigned
+        if (previousAgentId && previousAgentId.toString() !== agentId) {
+          socket.broadcast.to(`agent:${previousAgentId}`).emit('complaint_unassigned', {
+            complaintId,
+            unassignedAt: new Date()
+          });
+          
+          await createNotification({
+            title: 'Complaint Reassigned',
+            message: `Complaint "${complaint.title}" has been reassigned to another agent`,
+            type: 'assignment',
+            targetUsers: [previousAgentId],
+            referenceId: complaint._id,
+            data: { complaintId }
+          });
+        }
+        
+        // Update agent workload data for admin dashboard
+        const agents = await User.find({ role: 'agent' })
+          .select('name email activeComplaints')
+          .lean();
+          
+        io.to('admin').emit('agent_status_update', agents);
         
         // Create and send notification to complaint owner
         const notification = await createNotification({

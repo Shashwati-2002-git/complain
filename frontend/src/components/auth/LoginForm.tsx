@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { Mail, Lock, User, AlertCircle, UserCheck, ArrowRight, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import validateGoogleConfig from '../../services/googleAuthDebug';
+import { OTPVerification } from './OTPVerification';
 
 export function LoginForm() {
   const [isLogin, setIsLogin] = useState(true);
@@ -22,7 +23,9 @@ export function LoginForm() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, register, googleLogin } = useAuth();
+  
+  // Get auth context including OTP verification
+  const { login, register, googleLogin, pendingVerification, cancelVerification } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,11 +86,78 @@ export function LoginForm() {
 
   console.log('Google Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
   
+  // Handle OTP verification success
+  const handleVerificationSuccess = () => {
+    // This will be called after successful OTP verification
+    // The auth context will already have updated the user state
+    console.log("OTP verification successful");
+  };
+
+  // Show OTP verification screen if there's a pending verification
+  if (pendingVerification) {
+    return (
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''}>
+        <div className="min-h-screen bg-white flex">
+          {/* Left Side - Image and branding */}
+          <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 relative overflow-hidden">
+            {/* Background Pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-20 left-20 w-32 h-32 bg-white rounded-full"></div>
+              <div className="absolute bottom-32 right-20 w-24 h-24 bg-blue-300 rounded-full"></div>
+              <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-blue-400 rounded-full"></div>
+            </div>
+            
+            {/* Back button in left panel */}
+            <button
+              type="button"
+              onClick={cancelVerification}
+              className="absolute top-8 left-8 text-white hover:text-blue-200 transition-all duration-200 flex items-center gap-2 font-medium text-lg z-20"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Back to login
+            </button>
+            
+            <div className="relative z-10 flex flex-col justify-center items-center px-12 py-8 h-full">
+              {/* Text overlay heading similar to sign-in page */}
+              <div className="absolute top-20 inset-x-0 z-20 px-12">
+                <h1 className="text-4xl font-bold text-white mb-4">
+                  Join <span className="text-[#77BEF0]">QuickFix</span>
+                </h1>
+                <p className="text-xl text-blue-100">
+                  Start your journey with intelligent customer service automation verification
+                </p>
+              </div>
+              
+              {/* Security verification image on left side - full size */}
+              <div className="flex-grow flex items-center justify-center w-full h-full mt-24">
+                <img 
+                  src="security-verification.png" 
+                  alt="auth-verification" 
+                  className="w-full h-auto object-contain max-h-[550px]"
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Right Side - OTP Verification */}
+          <div className="w-full lg:w-1/2 flex flex-col justify-center">
+            <OTPVerification 
+              email={pendingVerification.email}
+              onVerifySuccess={handleVerificationSuccess}
+              onBack={cancelVerification}
+            />
+          </div>
+        </div>
+      </GoogleOAuthProvider>
+    );
+  }
+
+  // Render the main component
   return (
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''}>
       <div className="min-h-screen bg-white flex">
         {/* Left Side - Benefits */}
-                {/* Left Side - Benefits */}
+        {/* Left Side - Benefits */}
         <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 relative overflow-hidden">
           {/* Background Pattern */}
           <div className="absolute inset-0 opacity-10">

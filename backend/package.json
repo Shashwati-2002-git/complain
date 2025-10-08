@@ -14,6 +14,7 @@
     "seed": "node scripts/seedData.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@octokit/oauth-app": "^8.0.1",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",

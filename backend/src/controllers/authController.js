@@ -2,6 +2,7 @@ import { User } from "../models/User.js";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import fetch from "node-fetch";
+import { sendOtpEmail, generateOTP } from "../services/emailService.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -34,7 +35,7 @@ const validateSignup = (name, email, password) => {
   return errors;
 };
 
-// Signup
+// Signup with OTP verification
 export const registerUser = async (req, res) => {
   const { name, email, password, role = "user" } = req.body;
   
@@ -82,14 +83,30 @@ export const registerUser = async (req, res) => {
       console.log("Creating admin account - special permissions granted for development");
     }
     
+    // Generate OTP for verification
+    const otp = generateOTP();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+    
     const user = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
       role,
+      otp,
+      otpExpiry,
+      isVerified: false
     });
 
-    console.log("User created successfully:", {
+    // Send OTP via email
+    try {
+      await sendOtpEmail(user.email, user.name, otp);
+      console.log("OTP email sent to user");
+    } catch (emailError) {
+      console.error("Failed to send OTP email:", emailError);
+      // We continue even if email fails, but log the error
+    }
+
+    console.log("User registered (unverified):", {
       id: user._id,
       name: user.name,
       email: user.email,
@@ -98,13 +115,15 @@ export const registerUser = async (req, res) => {
 
     res.status(201).json({
       success: true,
+      message: "User registered successfully. Please verify your email with the OTP sent to your inbox.",
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
+        isVerified: false
       },
-      token: generateToken(user._id),
+      requiresVerification: true,
     });
   } catch (error) {
     console.error("Registration error:", error);
@@ -126,6 +145,26 @@ export const loginUser = async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase().trim() });
 
     if (user && (await user.matchPassword(password))) {
+      // Check if user is verified (except for OAuth users who are pre-verified)
+      if (!user.isVerified && !user.isGoogleUser && !user.isFacebookUser) {
+        // Generate new OTP for unverified users
+        const otp = generateOTP();
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+        
+        user.otp = otp;
+        user.otpExpiry = otpExpiry;
+        await user.save();
+        
+        // Send new OTP
+        await sendOtpEmail(user.email, user.name, otp);
+        
+        return res.status(401).json({
+          message: "Account not verified. A new verification OTP has been sent to your email.",
+          requiresVerification: true,
+          userId: user._id
+        });
+      }
+      
       console.log("User logged in successfully:", {
         id: user._id,
         name: user.name,
@@ -995,26 +1034,96 @@ export const processChatForComplaint = async (req, res) => {
 };
 
 // IBM Watson Assistant Integration
-import watsonPkg from 'ibm-watson/assistant/v2.js';
-import authPkg from 'ibm-watson/auth/index.js';
-const { AssistantV2 } = watsonPkg;
-const { IamAuthenticator } = authPkg;
+// Using dynamic imports for compatibility
+let AssistantV2;
+let IamAuthenticator;
+
+// Load Watson modules
+const loadWatsonModules = async () => {
+  try {
+    const watsonPkg = await import('ibm-watson/assistant/v2.js');
+    const authPkg = await import('ibm-watson/auth/index.js');
+    
+    AssistantV2 = watsonPkg.default;
+    IamAuthenticator = authPkg.IamAuthenticator;
+    
+    return true;
+  } catch (error) {
+    console.error("Error loading Watson modules:", error);
+    return false;
+  }
+};
 
 // Watson Assistant configuration
 let watsonAssistant;
-try {
-  watsonAssistant = new AssistantV2({
-    version: '2023-06-15',
-    authenticator: new IamAuthenticator({
-      apikey: process.env.WATSON_API_KEY || 'dummy-key',
-    }),
-    serviceUrl: `https://api.${process.env.WATSON_REGION || 'au-syd'}.assistant.watson.cloud.ibm.com/instances/${process.env.WATSON_SERVICE_INSTANCE_ID || 'a5a795e9-c341-4430-84fd-e1d87434aa61'}/v2`,
-  });
-} catch (error) {
-  console.warn('Watson Assistant not configured, using fallback');
-}
 
-const WATSON_ASSISTANT_ID = process.env.WATSON_ASSISTANT_ID || 'a5a795e9-c341-4430-84fd-e1d87434aa61';
+// Initialize Watson
+const initializeWatson = async () => {
+  try {
+    // Debug environment variables
+    console.log('Watson Configuration Debug:');
+    console.log('- API Key:', process.env.WATSON_API_KEY ? 
+      `${process.env.WATSON_API_KEY.substring(0, 5)}...${process.env.WATSON_API_KEY.substring(process.env.WATSON_API_KEY.length - 5)}` : 
+      'MISSING');
+    console.log('- Region:', process.env.WATSON_REGION || 'Not set (using default)');
+    console.log('- Service Instance ID:', process.env.WATSON_SERVICE_INSTANCE_ID || 'MISSING');
+    console.log('- Assistant ID:', process.env.WATSON_ASSISTANT_ID || 'MISSING');
+    console.log('- Skill ID:', process.env.WATSON_SKILL_ID || 'MISSING');
+    console.log('- Draft Environment ID:', process.env.WATSON_DRAFT_ENVIRONMENT_ID || 'MISSING');
+    console.log('- Live Environment ID:', process.env.WATSON_LIVE_ENVIRONMENT_ID || 'MISSING');
+    
+    if (!process.env.WATSON_API_KEY) {
+      throw new Error('Watson API key is missing in environment variables');
+    }
+    
+    if (!process.env.WATSON_SERVICE_INSTANCE_ID) {
+      throw new Error('Watson service instance ID is missing in environment variables');
+    }
+    
+    if (!process.env.WATSON_ASSISTANT_ID) {
+      throw new Error('Watson assistant ID is missing in environment variables');
+    }
+    
+    // Load Watson modules
+    const modulesLoaded = await loadWatsonModules();
+    if (!modulesLoaded) {
+      throw new Error('Failed to load Watson modules');
+    }
+    
+    // Use au-syd as default region if not specified
+    const region = process.env.WATSON_REGION || 'au-syd';
+    const serviceUrl = `https://${region}.assistant.watson.cloud.ibm.com/instances/${process.env.WATSON_SERVICE_INSTANCE_ID}/v2`;
+    
+    console.log('- Service URL:', serviceUrl);
+    
+    watsonAssistant = new AssistantV2({
+      version: '2023-06-15',
+      authenticator: new IamAuthenticator({
+        apikey: process.env.WATSON_API_KEY,
+      }),
+      serviceUrl: serviceUrl,
+      disableSslVerification: false,
+    });
+    console.log('Watson Assistant configured successfully');
+    return true;
+  } catch (error) {
+    console.warn('Watson Assistant not configured, using fallback:', error.message);
+    console.error('Watson initialization error details:', error);
+    return false;
+  }
+};
+
+// Define Watson constants
+const WATSON_ASSISTANT_ID = process.env.WATSON_ASSISTANT_ID;
+
+// Initialize Watson when the server starts
+initializeWatson().then(success => {
+  if (success) {
+    console.log('Watson Assistant initialized successfully at startup');
+  } else {
+    console.warn('Failed to initialize Watson Assistant at startup, will try again when needed');
+  }
+});
 
 // Watson Assistant session management
 const watsonSessions = new Map();
@@ -1022,19 +1131,43 @@ const watsonSessions = new Map();
 // Create Watson session
 const createWatsonSession = async (userId) => {
   try {
-    if (!watsonAssistant) throw new Error('Watson not configured');
+    // Ensure Watson Assistant is initialized
+    if (!watsonAssistant) {
+      const initialized = await initializeWatson();
+      if (!initialized) {
+        console.error('Cannot create Watson session: Failed to initialize Watson Assistant');
+        throw new Error('Watson Assistant initialization failed');
+      }
+    }
     
+    if (!WATSON_ASSISTANT_ID) {
+      console.error('Cannot create Watson session: Assistant ID not configured');
+      throw new Error('Watson Assistant ID not configured');
+    }
+    
+    // Check for existing session
     if (watsonSessions.has(userId)) {
+      console.log(`Using existing Watson session for user ${userId}`);
       return watsonSessions.get(userId);
     }
-
+    
+    console.log(`Creating new Watson session for user ${userId} with assistant ${WATSON_ASSISTANT_ID}`);
+    
     const response = await watsonAssistant.createSession({
       assistantId: WATSON_ASSISTANT_ID,
     });
-
+    
+    if (!response || !response.result || !response.result.session_id) {
+      console.error('Invalid response from Watson createSession:', response);
+      throw new Error('Failed to create Watson session: Invalid response');
+    }
+    
     const sessionId = response.result.session_id;
+    console.log(`Watson session created successfully: ${sessionId.substring(0, 8)}...`);
+    
     watsonSessions.set(userId, sessionId);
     
+    // Auto-delete session after 1 hour to prevent memory leaks
     setTimeout(() => {
       watsonSessions.delete(userId);
     }, 3600000);
@@ -1042,6 +1175,14 @@ const createWatsonSession = async (userId) => {
     return sessionId;
   } catch (error) {
     console.error('Error creating Watson session:', error);
+    if (error.body) {
+      try {
+        const errorDetails = JSON.parse(error.body);
+        console.error('Watson error details:', errorDetails);
+      } catch (e) {
+        console.error('Watson error body (raw):', error.body);
+      }
+    }
     throw error;
   }
 };
@@ -1062,13 +1203,17 @@ export const chatWithWatson = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Try to initialize Watson if not already initialized
     if (!watsonAssistant) {
-      return res.json({
-        success: true,
-        response: "Hello! I'm here to help you with your concerns. Watson Assistant is currently being configured. How can I assist you today?",
-        fallback: true,
-        sessionId: userId
-      });
+      const initialized = await initializeWatson();
+      if (!initialized) {
+        return res.json({
+          success: true,
+          response: "Hello! I'm here to help you with your concerns. Watson Assistant is currently being configured. How can I assist you today?",
+          fallback: true,
+          sessionId: userId
+        });
+      }
     }
 
     const sessionId = await createWatsonSession(userId);
@@ -1523,5 +1668,100 @@ export const refreshToken = async (req, res) => {
   } catch (error) {
     console.error('Error in token refresh:', error);
     return res.status(500).json({ message: 'Server error during token refresh' });
+  }
+};
+
+// Verify OTP
+export const verifyOTP = async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if OTP matches and has not expired
+    if (user.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    if (user.otpExpiry && new Date() > new Date(user.otpExpiry)) {
+      return res.status(400).json({ message: "OTP has expired. Please request a new one" });
+    }
+
+    // Mark user as verified and clear OTP fields
+    user.isVerified = true;
+    user.otp = undefined;
+    user.otpExpiry = undefined;
+    await user.save();
+
+    console.log("User verified successfully:", user.email);
+
+    // Generate tokens after verification
+    const accessToken = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    res.json({
+      success: true,
+      message: "Email verified successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isVerified: true
+      },
+      token: accessToken,
+      refreshToken: refreshToken
+    });
+  } catch (error) {
+    console.error("OTP verification error:", error);
+    res.status(500).json({ message: "Server error during OTP verification" });
+  }
+};
+
+// Resend OTP
+export const resendOTP = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
+
+    // Generate new OTP
+    const otp = generateOTP();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    user.otp = otp;
+    user.otpExpiry = otpExpiry;
+    await user.save();
+
+    // Send new OTP via email
+    await sendOtpEmail(user.email, user.name, otp);
+
+    res.json({
+      success: true,
+      message: "New OTP sent to your email",
+    });
+  } catch (error) {
+    console.error("Resend OTP error:", error);
+    res.status(500).json({ message: "Server error during OTP resend" });
   }
 };

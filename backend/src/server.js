@@ -1,8 +1,11 @@
+// Load environment variables first, before any other imports
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import dotenv from "dotenv";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
@@ -10,8 +13,10 @@ import connectDB from "./config/db.js";
 import { handleConnection } from "./socket/socketHandlers.js";
 import { User } from "./models/User.js";
 
-// Load environment variables
-dotenv.config();
+// Log system information on startup
+console.log('=== QuickFix Complaint Management System ===');
+console.log('Starting server with Socket.IO real-time updates');
+console.log('Node environment:', process.env.NODE_ENV);
 
 // Connect to MongoDB
 connectDB();
@@ -56,33 +61,49 @@ const io = new Server(server, {
 // Add authentication middleware
 io.use(async (socket, next) => {
   try {
+    console.log('Socket authentication attempt:', socket.id);
+    
     const token = socket.handshake.auth?.token;
     if (!token) {
+      console.error('Socket auth failed: Missing token', socket.id);
       return next(new Error("Authentication failed: Missing token"));
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const userId = decoded.id || decoded.userId;
+      // Log token format to help with debugging
+      console.log(`Token format: ${token.substring(0, 10)}...${token.substring(token.length - 5)}`);
+      
+      // Verify the token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret-key');
+      console.log('Token decoded successfully:', JSON.stringify(decoded));
+      
+      // Extract userId from different possible fields
+      const userId = decoded.id || decoded.userId || decoded.sub;
       if (!userId) {
-        return next(new Error("Authentication failed: Invalid token payload"));
+        console.error('Socket auth failed: Invalid token payload (no userId)', socket.id);
+        return next(new Error("Authentication failed: Invalid token payload - missing user ID"));
       }
       
       // Look up the user in the database
+      console.log('Looking up user:', userId);
       const user = await User.findById(userId).select('-password');
+      
       if (!user) {
+        console.error('Socket auth failed: User not found', userId, socket.id);
         return next(new Error("Authentication failed: User not found"));
       }
+      
+      console.log('Socket authenticated successfully:', user.name, user.role, socket.id);
       
       // Attach user to socket for later use
       socket.user = user;
       next();
     } catch (err) {
-      console.error('Socket authentication error:', err.message);
-      next(new Error("Authentication failed: Invalid token"));
+      console.error('Socket token verification error:', err.message, socket.id);
+      next(new Error(`Authentication failed: ${err.message}`));
     }
   } catch (error) {
-    console.error('Socket middleware error:', error);
+    console.error('Socket middleware uncaught error:', error, socket.id);
     next(new Error("Server error during authentication"));
   }
 });
@@ -92,6 +113,16 @@ handleConnection(io);
 
 // Make io available to routes
 app.set('io', io);
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    server: 'QuickFix Backend API',
+    version: '1.0.0'
+  });
+});
 
 // Middleware
 // Add request logger for debugging
@@ -163,10 +194,12 @@ import usersRoutes from "./routes/users.js";
 import notificationsRoutes from "./routes/notifications.js";
 import analyticsRoutes from "./routes/analytics.js";
 import adminRoutes from "./routes/admin.js";
+import agentsRoutes from "./routes/agents.js";
 
 app.use("/api/auth", authRoutes);
 app.use("/api/complaints", complaintsRoutes);
 app.use("/api/users", usersRoutes);
+app.use("/api/agents", agentsRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/admin", adminRoutes);
@@ -197,10 +230,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🔌 Socket.IO server initialized`);
 });

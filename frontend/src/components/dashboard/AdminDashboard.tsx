@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Settings, Shield, BarChart3, Activity, FileText, UserCheck, MessageCircle, RefreshCw } from 'lucide-react';
+import { Settings, Shield, BarChart3, Activity, FileText, UserCheck, UserX, MessageCircle, RefreshCw } from 'lucide-react';
 import { useSocket } from '../../hooks/useSocket';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/apiService';
+import { agentService } from '../../services/agentService';
 
 // Helper function to get background color class based on agent color
 const getAgentBgColorClass = (color: string): string => {
@@ -48,6 +49,7 @@ interface Agent {
   name: string;
   initials: string;
   status: string;
+  availability: string;
   currentLoad: number;
   avgResponseTime: string;
   color: string;
@@ -84,6 +86,7 @@ interface ApiAgentData {
   firstName?: string;
   lastName?: string;
   agentStatus?: string;
+  availability?: string;
   activeComplaints?: any[];
   metrics?: {
     avgResponseTime?: number;
@@ -302,9 +305,9 @@ export const AdminDashboard = () => {
     try {
       setIsRefreshing(true);
       
-      // Fetch agents and dashboard analytics
+      // Fetch agents, including availability status, and dashboard analytics
       const [agentsResponse, analyticsResponse] = await Promise.all([
-        apiService.getAllUsers({ role: 'agent' }),
+        agentService.getAllAgents(),
         apiService.getDashboardAnalytics('30')
       ]);
       
@@ -315,6 +318,7 @@ export const AdminDashboard = () => {
           name: agent.name || `${agent.firstName || ''} ${agent.lastName || ''}`.trim(),
           initials: getInitials(agent.name || `${agent.firstName || ''} ${agent.lastName || ''}`),
           status: agent.agentStatus || 'available',
+          availability: agent.availability || 'available',
           currentLoad: agent.activeComplaints?.length || 0,
           avgResponseTime: formatResponseTime(agent.metrics?.avgResponseTime),
           color: getAgentColor(agent.activeComplaints?.length || 0),
@@ -343,6 +347,75 @@ export const AdminDashboard = () => {
       setIsRefreshing(false);
     }
   }, [setIsRefreshing]);
+  
+  // Subscribe to real-time updates
+  useEffect(() => {
+    if (!isConnected) return;
+    
+    // Handle new complaints
+    const handleNewComplaint = (event: Event) => {
+      const newComplaint = (event as CustomEvent).detail;
+      console.log('New complaint received in AdminDashboard:', newComplaint);
+      
+      // Update ticket data counts
+      setTicketsData(prev => ({
+        ...prev,
+        total: prev.total + 1,
+        pending: prev.pending + 1,
+        newToday: prev.newToday + 1
+      }));
+    };
+    
+    // Handle status updates
+    const handleStatusUpdate = (event: Event) => {
+      const update = (event as CustomEvent).detail;
+      console.log('Complaint status update in AdminDashboard:', update);
+      
+      // Refresh dashboard data to get accurate counts
+      fetchDashboardData();
+    };
+    
+    // Handle agent status updates
+    const handleAgentStatusUpdate = (event: Event) => {
+      const { agents: updatedAgents } = (event as CustomEvent).detail;
+      console.log('Agent status update in AdminDashboard:', updatedAgents);
+      
+      if (Array.isArray(updatedAgents)) {
+        // Format agent data
+        const formattedAgents = updatedAgents.map(agent => ({
+          id: agent._id,
+          name: agent.name,
+          initials: agent.name.split(' ').map((n: string) => n[0]).join(''),
+          status: agent.isOnline ? 'available' : 'offline',
+          currentLoad: agent.activeComplaints?.length || 0,
+          avgResponseTime: agent.avgResponseTime || '5m',
+          color: getAgentColor(agent.activeComplaints?.length || 0),
+          lastUpdated: new Date(agent.lastActive || Date.now())
+        }));
+        setAgents(formattedAgents);
+      }
+    };
+    
+    // Handle dashboard stats updates
+    const handleDashboardStatsUpdate = (event: Event) => {
+      console.log('Dashboard stats update:', (event as CustomEvent).detail);
+      fetchDashboardData();
+    };
+    
+    // Register event listeners
+    window.addEventListener('newComplaint', handleNewComplaint);
+    window.addEventListener('complaintStatusUpdate', handleStatusUpdate);
+    window.addEventListener('agentStatusUpdate', handleAgentStatusUpdate);
+    window.addEventListener('dashboardStatsUpdate', handleDashboardStatsUpdate);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('newComplaint', handleNewComplaint);
+      window.removeEventListener('complaintStatusUpdate', handleStatusUpdate);
+      window.removeEventListener('agentStatusUpdate', handleAgentStatusUpdate);
+      window.removeEventListener('dashboardStatsUpdate', handleDashboardStatsUpdate);
+    };
+  }, [isConnected, fetchDashboardData]);
 
   // Fetch agent performance data
   const fetchAgentPerformance = useCallback(async () => {
@@ -529,6 +602,18 @@ export const AdminDashboard = () => {
     try {
       setIsRefreshing(true);
       
+      // Check if agent is available first
+      const agent = agents.find(a => a.id === agentId);
+      if (!agent) {
+        alert('Agent not found');
+        return;
+      }
+      
+      if (agent.availability !== 'available') {
+        alert(`Cannot assign ticket: Agent ${agent.name} is currently ${agent.availability}`);
+        return;
+      }
+      
       // Get pending complaints
       const complaintsResponse = await apiService.getComplaints({ status: 'New' });
       if (!complaintsResponse.data || !Array.isArray(complaintsResponse.data) || complaintsResponse.data.length === 0) {
@@ -540,11 +625,19 @@ export const AdminDashboard = () => {
       const complaintToAssign = complaintsResponse.data[0] as Complaint;
       await apiService.assignComplaint(complaintToAssign._id, agentId);
       
+      // Update agent availability to busy
+      await agentService.updateAvailability(agentId, 'busy');
+      
       // Update local state optimistically
       setAgents(prevAgents => {
         return prevAgents.map(agent => {
-          if (agent.id === agentId && agent.status === 'available') {
-            return { ...agent, currentLoad: agent.currentLoad + 1 };
+          if (agent.id === agentId) {
+            return { 
+              ...agent, 
+              currentLoad: agent.currentLoad + 1,
+              availability: 'busy',
+              status: 'busy'
+            };
           }
           return agent;
         });
@@ -758,12 +851,21 @@ export const AdminDashboard = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${agent.status === 'available' ? 'bg-green-100 text-green-800' : 
-                          agent.status === 'busy' ? 'bg-yellow-100 text-yellow-800' : 
-                          'bg-gray-100 text-gray-800'}`}>
-                          {agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            ${agent.status === 'available' ? 'bg-green-100 text-green-800' : 
+                            agent.status === 'busy' ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-gray-100 text-gray-800'}`}>
+                            {agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}
+                          </span>
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            ${agent.availability === 'available' ? 'bg-green-100 text-green-800' : 
+                            agent.availability === 'busy' ? 'bg-yellow-100 text-yellow-800' : 
+                            agent.availability === 'offline' ? 'bg-gray-400 text-white' :
+                            'bg-gray-100 text-gray-800'}`}>
+                            Availability: {agent.availability.charAt(0).toUpperCase() + agent.availability.slice(1)}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
@@ -787,13 +889,18 @@ export const AdminDashboard = () => {
                         {new Date(agent.lastUpdated).toLocaleTimeString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {agent.status !== 'offline' && (
+                        {agent.availability !== 'offline' && (
                           <button 
                             onClick={() => assignTicket(agent.id)}
                             className={`text-indigo-600 hover:text-indigo-900 ${
-                              agent.status === 'busy' && agent.currentLoad >= 5 ? 'opacity-50 cursor-not-allowed' : ''
+                              agent.availability !== 'available' || agent.currentLoad >= 5 ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
-                            disabled={agent.status === 'busy' && agent.currentLoad >= 5}
+                            disabled={agent.availability !== 'available' || agent.currentLoad >= 5}
+                            title={
+                              agent.availability !== 'available' ? `Agent is ${agent.availability}` :
+                              agent.currentLoad >= 5 ? 'Agent has maximum workload' : 
+                              'Assign a new ticket to this agent'
+                            }
                           >
                             Assign Ticket
                           </button>

@@ -42,12 +42,29 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     (newSocket: Socket) => {
       newSocket.on('connect', () => {
         console.log('✅ Socket connected:', newSocket.id);
-        setIsConnected(true);
+        // Don't set isConnected=true yet - wait for connection_success from server
       });
 
       newSocket.on('disconnect', (reason) => {
         console.log('⚠️ Socket disconnected:', reason);
         setIsConnected(false);
+      });
+      
+      newSocket.on('connection_success', (data) => {
+        console.log('🔐 Socket authenticated successfully:', data);
+        setIsConnected(true);
+      });
+      
+      newSocket.on('connection_error', (error) => {
+        console.error('⛔ Socket authentication failed:', error);
+        setIsConnected(false);
+        // Disconnect and try again with fresh token
+        newSocket.disconnect();
+        
+        // Try to refresh token and reconnect
+        setTimeout(() => {
+          refreshToken(); // Use refreshToken directly instead
+        }, 1000);
       });
 
       newSocket.on('connect_error', (error) => {
@@ -93,8 +110,66 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         setOnlineUsers(users);
       });
 
-      newSocket.on('complaint_updated', (data) => {
-        window.dispatchEvent(new CustomEvent('complaintUpdated', { detail: data.complaint }));
+      // Listen for new complaints (admin and agent dashboards)
+      newSocket.on('new_complaint', (complaint) => {
+        console.log('New complaint received via socket:', complaint);
+        window.dispatchEvent(new CustomEvent('newComplaint', { detail: complaint }));
+        
+        // Show browser notification
+        if (Notification.permission === 'granted') {
+          new Notification('New Complaint Filed', {
+            body: `${complaint.title} - ${complaint.description?.substring(0, 50)}...`,
+            icon: '/favicon.ico',
+          });
+        }
+      });
+      
+      // Listen for complaint status updates
+      newSocket.on('complaint_status_update', (data) => {
+        console.log('Complaint status updated via socket:', data);
+        window.dispatchEvent(new CustomEvent('complaintStatusUpdate', { detail: data }));
+        
+        // Show browser notification
+        if (Notification.permission === 'granted') {
+          new Notification('Complaint Status Updated', {
+            body: `Complaint #${data.complaintId} status is now ${data.status}`,
+            icon: '/favicon.ico',
+          });
+        }
+      });
+      
+      // Listen for complaint assignments
+      newSocket.on('complaint_assigned', (data) => {
+        console.log('Complaint assigned via socket:', data);
+        window.dispatchEvent(new CustomEvent('complaintAssigned', { detail: data }));
+        
+        // Show browser notification
+        if (Notification.permission === 'granted') {
+          const title = user?.role === 'agent' ? 
+            'New Complaint Assigned' : 
+            'Agent Assigned to Your Complaint';
+            
+          const body = user?.role === 'agent' ?
+            `Complaint "${data.complaint?.title || 'New complaint'}" has been assigned to you` :
+            `Agent ${data.agentName} has been assigned to your complaint`;
+            
+          new Notification(title, {
+            body,
+            icon: '/favicon.ico',
+          });
+        }
+      });
+      
+      newSocket.on('complaint_status_updated', (data) => {
+        window.dispatchEvent(new CustomEvent('complaintUpdated', { detail: data }));
+      });
+
+      newSocket.on('dashboard_stats_update', (data) => {
+        window.dispatchEvent(new CustomEvent('dashboardStatsUpdate', { detail: data }));
+      });
+      
+      newSocket.on('agent_status_update', (agents) => {
+        window.dispatchEvent(new CustomEvent('agentStatusUpdate', { detail: { agents } }));
       });
 
       newSocket.on('dashboard_update', (data) => {
@@ -207,8 +282,89 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         if (freshToken) newSocket.auth = { token: freshToken };
       });
     },
-    [checkTokenExpiration, logout, refreshToken]
+    [checkTokenExpiration, logout, refreshToken, user?.role]
   );
+
+  // -------------------- Socket Actions --------------------
+  
+  // Join a complaint room to receive real-time updates about a specific complaint
+  const joinComplaintRoom = useCallback((complaintId: string) => {
+    if (!socket || !isConnected) return;
+    console.log(`Joining complaint room: ${complaintId}`);
+    socket.emit('join_complaint', { complaintId });
+  }, [socket, isConnected]);
+  
+  // Leave a complaint room
+  const leaveComplaintRoom = useCallback((complaintId: string) => {
+    if (!socket || !isConnected) return;
+    console.log(`Leaving complaint room: ${complaintId}`);
+    socket.emit('leave_complaint', { complaintId });
+  }, [socket, isConnected]);
+  
+  // Send a message in a complaint thread
+  const sendMessage = useCallback((complaintId: string, message: string, isInternal: boolean = false) => {
+    if (!socket || !isConnected) return;
+    console.log(`Sending message to complaint ${complaintId}:`, message);
+    socket.emit('send_message', { 
+      complaintId, 
+      message,
+      isInternal
+    });
+  }, [socket, isConnected]);
+  
+  // Update a complaint (status, priority, etc.)
+  const updateComplaint = useCallback((complaintId: string, updates: ComplaintUpdate, note?: string) => {
+    if (!socket || !isConnected) return;
+    
+    console.log(`Updating complaint ${complaintId}:`, updates);
+    
+    // Handle status updates specially for tracking history
+    if (updates.status) {
+      socket.emit('update_complaint_status', {
+        complaintId,
+        status: updates.status,
+        note
+      });
+    }
+    
+    // Handle other updates
+    if (updates.priority || updates.category) {
+      socket.emit('update_complaint_details', {
+        complaintId,
+        updates
+      });
+    }
+    
+    // Handle assignment
+    if (updates.assignedTo) {
+      socket.emit('assign_complaint', {
+        complaintId,
+        agentId: updates.assignedTo
+      });
+    }
+  }, [socket, isConnected]);
+  
+  // Mark notifications as read
+  const markNotificationsRead = useCallback((notificationIds: string[]) => {
+    if (!socket || !isConnected || !notificationIds.length) return;
+    
+    socket.emit('mark_notifications_read', { notificationIds });
+    
+    // Update local state optimistically
+    setNotifications(prev => 
+      prev.map(notification => 
+        notificationIds.includes(notification._id) 
+          ? { ...notification, isRead: true }
+          : notification
+      )
+    );
+  }, [socket, isConnected]);
+  
+  // Notify about a new complaint being created (after API call)
+  const notifyNewComplaint = useCallback((complaintId: string) => {
+    if (!socket || !isConnected) return;
+    socket.emit('new_complaint_created', { complaintId });
+  }, [socket, isConnected]);
 
   // -------------------- Socket Connection --------------------
   const connectSocket = useCallback(
@@ -270,76 +426,42 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         }
       }
       
-      // Use dedicated socket URL from environment variables, or fallback to API URL
-      // CRITICAL: Socket.IO client requires http:// protocol (NOT ws://)
-      try {
-        const socketServerUrl = import.meta.env.VITE_SOCKET_SERVER_URL;
-        const socketPort = import.meta.env.VITE_SOCKET_PORT || '5001';
-        
-        console.log('Initializing socket with config:', {
-          VITE_SOCKET_SERVER_URL: socketServerUrl,
-          VITE_SOCKET_PORT: socketPort,
-          VITE_API_URL: import.meta.env.VITE_API_URL
-        });
-        
-        // Build a stable base URL to avoid undefined segments
-        let baseURL = '';
-        
-        if (socketServerUrl && typeof socketServerUrl === 'string' && socketServerUrl !== 'undefined') {
-          baseURL = socketServerUrl;
-        } else if (import.meta.env.VITE_API_URL && typeof import.meta.env.VITE_API_URL === 'string') {
-          baseURL = import.meta.env.VITE_API_URL.replace('/api', '');
-        } else {
-          baseURL = `http://localhost:${socketPort}`;
-        }
-        
-        // Ensure URL has proper http:// or https:// protocol (required for Socket.IO)
-        if (!baseURL.startsWith('http://') && !baseURL.startsWith('https://')) {
-          baseURL = `http://${baseURL}`;
-        }
-        
-        // Final safety check to avoid 'undefined' in URLs
-        if (baseURL.includes('undefined')) {
-          console.error('⚠️ Invalid socket URL contains undefined:', baseURL);
-          baseURL = `http://localhost:${socketPort}`;
-        }
-        
-        console.log('🔌 Socket connecting to:', baseURL);
-      
       // Verify token one more time before connecting
       if (!token) {
         console.error('Cannot connect socket: No authentication token available');
         return null;
       }
+      
+      // Use dedicated socket URL from environment variables, or fallback to API URL
+      const baseURL = import.meta.env.VITE_SOCKET_SERVER_URL || 'http://localhost:5001';
+      
+      console.log('🔌 Socket connecting to:', baseURL);
         
       const socketOptions = {
         auth: {
-          token,
-          userId // Include userId extracted from token or localStorage
+          token // Simplified to just include the token
         },
-        transports: ['websocket', 'polling'], // Try WebSocket first, then fall back to polling
-        reconnection: true, // Enable built-in reconnection
-        reconnectionAttempts: 5, // Increased from 3
-        reconnectionDelay: 1000, // Start with a shorter delay
-        reconnectionDelayMax: 10000,
-        timeout: 20000, // Increased from 10000 to allow more time for connection
-        forceNew: true, // Force a new connection each time
-        autoConnect: true, // Connect immediately
+        transports: ['websocket', 'polling'], 
+        reconnection: true,
+        reconnectionAttempts: 3,
+        reconnectionDelay: 1000,
+        timeout: 10000,
+        forceNew: true
       };
       
       console.log('Initializing socket with options:', socketOptions);
-      const socket = io(baseURL, socketOptions);
       
-      setupSocketListeners(socket);
-      setSocket(socket);
-      return socket;
-      
-      } catch (err) {
-        console.error('Fatal error initializing socket:', err);
+      try {
+        const socket = io(baseURL, socketOptions);
+        setupSocketListeners(socket);
+        setSocket(socket);
+        return socket;
+      } catch (error) {
+        console.error('Failed to initialize socket:', error);
         return null;
       }
     },
-    [setupSocketListeners] // Dependencies are now properly included in setupSocketListeners
+    [setupSocketListeners]
   );
 
   // -------------------- Manage Lifecycle --------------------
@@ -439,58 +561,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   }, [user, connectSocket, checkTokenExpiration, socket]);
 
   // -------------------- Helper Functions --------------------
-  const sendMessage = useCallback(
-    (complaintId: string, message: string, isInternal = false) => {
-      if (socket && isConnected) {
-        socket.emit(isInternal ? 'internal_message' : 'send_message', {
-          complaintId,
-          message,
-        });
-      } else {
-        console.warn('Cannot send message: socket not connected');
-      }
-    },
-    [socket, isConnected]
-  );
+  // Socket action functions are defined above
 
-  const updateComplaint = useCallback(
-    (complaintId: string, updates: ComplaintUpdate, note?: string) => {
-      if (socket && isConnected) {
-        socket.emit('update_complaint', { complaintId, updates, note });
-      } else {
-        console.warn('Cannot update complaint: socket not connected');
-      }
-    },
-    [socket, isConnected]
-  );
-
-  const markNotificationsRead = useCallback(
-    (notificationIds: string[]) => {
-      if (socket && isConnected && notificationIds.length > 0) {
-        socket.emit('mark_notifications_read', { notificationIds });
-        setNotifications((prev) =>
-          prev.map((n) =>
-            notificationIds.includes(n._id) ? { ...n, isRead: true } : n
-          )
-        );
-      }
-    },
-    [socket, isConnected]
-  );
-
-  const joinComplaintRoom = useCallback(
-    (complaintId: string) => {
-      socket?.emit('join_complaint', { complaintId });
-    },
-    [socket]
-  );
-
-  const leaveComplaintRoom = useCallback(
-    (complaintId: string) => {
-      socket?.emit('leave_complaint', { complaintId });
-    },
-    [socket]
-  );
+  // Socket room functions are defined above
 
   // -------------------- Context Value --------------------
   const contextValue: SocketContextType = {
@@ -503,6 +576,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     markNotificationsRead,
     joinComplaintRoom,
     leaveComplaintRoom,
+    notifyNewComplaint
   };
 
   return (

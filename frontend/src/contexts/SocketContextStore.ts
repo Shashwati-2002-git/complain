@@ -35,6 +35,7 @@ export interface SocketContextType {
   markNotificationsRead: (notificationIds: string[]) => void;
   joinComplaintRoom: (complaintId: string) => void;
   leaveComplaintRoom: (complaintId: string) => void;
+  notifyNewComplaint: (complaintId: string) => void;
 }
 
 export const SocketContext = createContext<SocketContextType | undefined>(undefined);

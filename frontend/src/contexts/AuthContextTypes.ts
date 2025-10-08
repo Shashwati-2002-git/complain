@@ -10,6 +10,12 @@ export interface User {
   role: "user" | "agent" | "admin" | "analytics";
 }
 
+// OTP verification pending interface
+export interface PendingVerification {
+  email: string;
+  userId: string | null;
+}
+
 // Auth context interface
 export interface AuthContextType {
   user: User | null;
@@ -35,6 +41,11 @@ export interface AuthContextType {
     role: "user" | "agent" | "admin" | "analytics"
   ) => Promise<boolean>;
   validateSession: () => Promise<boolean>;
+  // OTP verification related props
+  pendingVerification: PendingVerification | null;
+  verifyOTP: (email: string, otp: string) => Promise<boolean>;
+  resendOTP: (email: string) => Promise<boolean>;
+  cancelVerification: () => void;
 }
 
 // Create Auth Context

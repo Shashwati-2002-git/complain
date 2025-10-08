@@ -96,9 +96,17 @@ export const initConnectionHandler = (io) => {
     // User should be available from authentication middleware
     if (!socket.user) {
       console.error('Socket missing user data after middleware - this should never happen');
+      socket.emit('connection_error', { message: 'Authentication failed: User data missing' });
       socket.disconnect();
       return;
     }
+    
+    // Acknowledge successful connection
+    socket.emit('connection_success', {
+      message: 'Successfully connected to socket server',
+      userId: socket.user._id.toString(),
+      role: socket.user.role
+    });
     
     const user = socket.user;
     console.log(`User authenticated: ${user.name || `${user.firstName} ${user.lastName}`} (${user.role})`);
@@ -130,6 +138,36 @@ export const initConnectionHandler = (io) => {
     
     console.log(`Total connected users: ${connectedUsers.size}`);
     
+    // Join role-based room
+    socket.join(user.role);
+    console.log(`User ${userId} joined room: ${user.role}`);
+    
+    // Join user-specific room
+    socket.join(`${user.role}:${userId}`);
+    console.log(`User ${userId} joined room: ${user.role}:${userId}`);
+    
+    // For agents and admins, update online status
+    if (user.role === 'agent' || user.role === 'admin') {
+      try {
+        // Update user's online status
+        await User.findByIdAndUpdate(userId, { 
+          isOnline: true,
+          lastActive: new Date()
+        });
+        
+        // Broadcast agent status update to admin dashboard
+        if (user.role === 'agent') {
+          const agents = await User.find({ role: 'agent' })
+            .select('name email isOnline lastActive activeComplaints')
+            .lean();
+          
+          io.to('admin').emit('agent_status_update', agents);
+        }
+      } catch (error) {
+        console.error('Error updating user status on connection:', error);
+      }
+    }
+    
     // Send user their unread notifications
     try {
       const unreadNotifications = await Notification.find({
@@ -148,6 +186,39 @@ export const initConnectionHandler = (io) => {
     } catch (error) {
       console.error('Error retrieving notifications:', error);
     }
+    
+    // Handle disconnect
+    socket.on('disconnect', async () => {
+      console.log(`Socket disconnected: ${socket.id} - User: ${userId}`);
+      
+      // Remove user from connected users map
+      connectedUsers.delete(userId);
+      
+      // Update online users list and broadcast changes
+      await updateOnlineUsers();
+      broadcastOnlineUsers(io);
+      
+      if (user.role === 'agent' || user.role === 'admin') {
+        try {
+          // Update user's online status
+          await User.findByIdAndUpdate(userId, { 
+            isOnline: false,
+            lastActive: new Date()
+          });
+          
+          // Broadcast agent status update to admin dashboard
+          if (user.role === 'agent') {
+            const agents = await User.find({ role: 'agent' })
+              .select('name email isOnline lastActive activeComplaints')
+              .lean();
+            
+            io.to('admin').emit('agent_status_update', agents);
+          }
+        } catch (error) {
+          console.error('Error updating user status on disconnect:', error);
+        }
+      }
+    });
     
     // Broadcast online users to all clients
     await updateOnlineUsers();
