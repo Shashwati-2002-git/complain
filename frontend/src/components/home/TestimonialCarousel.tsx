@@ -43,7 +43,7 @@ const TestimonialCarousel: React.FC<TestimonialProps> = ({ autoScrollInterval = 
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const carouselRef = useRef<HTMLDivElement>(null);
-  const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const totalSlides = testimonials.length;
 
@@ -52,11 +52,7 @@ const TestimonialCarousel: React.FC<TestimonialProps> = ({ autoScrollInterval = 
     const slideIndex = (index + totalSlides) % totalSlides;
     setCurrentSlide(slideIndex);
     
-    // Scroll the carousel to the selected slide
-    if (carouselRef.current) {
-      const slideWidth = carouselRef.current.clientWidth;
-      carouselRef.current.scrollLeft = slideIndex * slideWidth;
-    }
+    // No need to manually scroll as we're using transform in the render
   }, [totalSlides]);
 
   const nextSlide = useCallback(() => {
@@ -102,14 +98,22 @@ const TestimonialCarousel: React.FC<TestimonialProps> = ({ autoScrollInterval = 
 
   // Initialize auto-scroll
   useEffect(() => {
-    resetAutoScroll();
+    if (isAutoScrolling) {
+      resetAutoScroll();
+    } else {
+      // Clear any existing timer when auto-scrolling is turned off
+      if (autoScrollTimerRef.current) {
+        clearInterval(autoScrollTimerRef.current);
+        autoScrollTimerRef.current = null;
+      }
+    }
     
     return () => {
       if (autoScrollTimerRef.current) {
         clearInterval(autoScrollTimerRef.current);
       }
     };
-  }, [resetAutoScroll, currentSlide]);
+  }, [resetAutoScroll, currentSlide, isAutoScrolling]);
 
   // Handle manual interaction
   const handleManualNavigation = (index: number) => {
@@ -118,15 +122,22 @@ const TestimonialCarousel: React.FC<TestimonialProps> = ({ autoScrollInterval = 
   };
 
   return (
-    <div className="relative w-full overflow-hidden">
+    <div className="relative w-full overflow-hidden" role="region" aria-label="Testimonials carousel">
       {/* Carousel Container */}
       <div 
         ref={carouselRef}
         className="flex transition-transform duration-500 ease-in-out"
         style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+        aria-live="polite"
       >
         {testimonials.map((testimonial, index) => (
-          <div key={index} className="carousel-slide min-w-full flex-shrink-0">
+          <div 
+            key={index} 
+            className="carousel-slide min-w-full flex-shrink-0"
+            aria-hidden={currentSlide !== index ? "true" : "false"}
+            role="tabpanel"
+            id={`slide-${index}`}
+          >
             <div className="bg-white rounded-xl overflow-hidden shadow-lg">
               <div className="flex flex-col md:flex-row">
                 {/* Left Content Panel */}
@@ -152,8 +163,12 @@ const TestimonialCarousel: React.FC<TestimonialProps> = ({ autoScrollInterval = 
                       src={testimonial.image} 
                       alt={testimonial.imageAlt} 
                       className="w-full h-full object-cover"
+                      loading="lazy"
                     />
-                    <div className="absolute right-4 bottom-4 w-8 h-8 bg-white rounded-full flex items-center justify-center opacity-70">
+                    <div 
+                      className="absolute right-4 bottom-4 w-8 h-8 bg-white rounded-full flex items-center justify-center opacity-70"
+                      aria-hidden="true"
+                    >
                       <div className="w-4 h-4 bg-gray-100 rotate-45"></div>
                     </div>
                   </div>
@@ -166,23 +181,31 @@ const TestimonialCarousel: React.FC<TestimonialProps> = ({ autoScrollInterval = 
       
       {/* Navigation Arrows */}
       <button 
-        onClick={prevSlide}
+        onClick={() => {
+          prevSlide();
+          setIsAutoScrolling(false);
+        }}
         className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-80 rounded-full p-2 shadow-md hover:bg-opacity-100 transition-all z-10"
         aria-label="Previous slide"
+        type="button"
       >
         <ChevronLeft className="w-6 h-6 text-gray-800" />
       </button>
       
       <button 
-        onClick={nextSlide}
+        onClick={() => {
+          nextSlide();
+          setIsAutoScrolling(false);
+        }}
         className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-80 rounded-full p-2 shadow-md hover:bg-opacity-100 transition-all z-10"
         aria-label="Next slide"
+        type="button"
       >
         <ChevronRight className="w-6 h-6 text-gray-800" />
       </button>
       
       {/* Indicator Dots */}
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2" role="tablist">
         {testimonials.map((_, index) => (
           <button
             key={index}
@@ -191,6 +214,10 @@ const TestimonialCarousel: React.FC<TestimonialProps> = ({ autoScrollInterval = 
               index === currentSlide ? 'bg-blue-600 w-6' : 'bg-gray-400'
             }`}
             aria-label={`Go to slide ${index + 1}`}
+            aria-selected={index === currentSlide ? "true" : "false"}
+            aria-controls={`slide-${index}`}
+            role="tab"
+            type="button"
           />
         ))}
       </div>
