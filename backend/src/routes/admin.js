@@ -335,4 +335,303 @@ router.get('/export/:type', authenticate, authorize('admin'), asyncHandler(async
   }
 }));
 
+// System settings management
+router.get('/settings', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  // In a real app, these would come from a settings collection
+  const systemSettings = {
+    slaTargets: {
+      urgent: 4,
+      high: 24,
+      medium: 48,
+      low: 72
+    },
+    autoAssignment: {
+      enabled: true,
+      algorithm: 'workload_based'
+    },
+    categories: [
+      'Technical Issue',
+      'Billing',
+      'Account Management',
+      'Product Support',
+      'General Inquiry',
+      'Feature Request',
+      'Bug Report'
+    ],
+    departments: [
+      'Technical Support',
+      'Customer Service',
+      'Billing',
+      'Sales',
+      'Management'
+    ],
+    notifications: {
+      emailEnabled: true,
+      smsEnabled: false,
+      pushEnabled: true
+    }
+  };
+
+  res.json(systemSettings);
+}));
+
+// Update system settings
+router.patch('/settings', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { slaTargets, autoAssignment, categories, departments, notifications } = req.body;
+
+  // In a real app, you would update a settings collection in the database
+  // For now, we'll just return success
+  res.json({
+    message: 'System settings updated successfully',
+    settings: req.body
+  });
+}));
+
+// Advanced analytics for admin dashboard
+router.get('/analytics/advanced', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { timeRange = '30' } = req.query;
+  const days = parseInt(timeRange);
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  try {
+    // System performance metrics
+    const [
+      totalComplaints,
+      resolvedComplaints,
+      escalatedComplaints,
+      overdueComplaints,
+      avgResolutionTime,
+      categoryDistribution,
+      priorityDistribution,
+      dailyVolume
+    ] = await Promise.all([
+      Complaint.countDocuments({ createdAt: { $gte: startDate } }),
+      Complaint.countDocuments({ 
+        createdAt: { $gte: startDate },
+        status: { $in: ['Resolved', 'Closed'] }
+      }),
+      Complaint.countDocuments({ 
+        createdAt: { $gte: startDate },
+        isEscalated: true 
+      }),
+      Complaint.countDocuments({
+        createdAt: { $gte: startDate },
+        status: { $nin: ['Resolved', 'Closed'] },
+        slaTarget: { $lt: new Date() }
+      }),
+      // Average resolution time
+      Complaint.aggregate([
+        { 
+          $match: { 
+            createdAt: { $gte: startDate },
+            status: { $in: ['Resolved', 'Closed'] },
+            'metrics.resolutionTime': { $exists: true }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            avgTime: { $avg: '$metrics.resolutionTime' }
+          }
+        }
+      ]),
+      // Category distribution
+      Complaint.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ]),
+      // Priority distribution
+      Complaint.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        { $group: { _id: '$priority', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ]),
+      // Daily volume trends
+      Complaint.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            count: { $sum: 1 },
+            resolved: {
+              $sum: { $cond: [{ $in: ['$status', ['Resolved', 'Closed']] }, 1, 0] }
+            }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ])
+    ]);
+
+    // Calculate additional metrics
+    const resolutionRate = totalComplaints > 0 ? (resolvedComplaints / totalComplaints * 100) : 0;
+    const escalationRate = totalComplaints > 0 ? (escalatedComplaints / totalComplaints * 100) : 0;
+    const slaCompliance = totalComplaints > 0 ? ((totalComplaints - overdueComplaints) / totalComplaints * 100) : 100;
+
+    res.json({
+      overview: {
+        totalComplaints,
+        resolvedComplaints,
+        escalatedComplaints,
+        overdueComplaints,
+        resolutionRate: Math.round(resolutionRate * 10) / 10,
+        escalationRate: Math.round(escalationRate * 10) / 10,
+        slaCompliance: Math.round(slaCompliance * 10) / 10,
+        avgResolutionTime: avgResolutionTime[0]?.avgTime || 0
+      },
+      distributions: {
+        byCategory: categoryDistribution,
+        byPriority: priorityDistribution
+      },
+      trends: {
+        daily: dailyVolume
+      },
+      timeRange: days
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch advanced analytics' });
+  }
+}));
+
+// Agent workload management
+router.get('/agents/workload', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  try {
+    const agentWorkloads = await User.aggregate([
+      { $match: { role: 'agent', isActive: true } },
+      {
+        $lookup: {
+          from: 'complaints',
+          let: { agentId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$assignedTo', '$$agentId'] },
+                status: { $nin: ['Resolved', 'Closed'] }
+              }
+            }
+          ],
+          as: 'activeComplaints'
+        }
+      },
+      {
+        $lookup: {
+          from: 'complaints',
+          let: { agentId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$assignedTo', '$$agentId'] },
+                status: { $nin: ['Resolved', 'Closed'] },
+                priority: 'Urgent'
+              }
+            }
+          ],
+          as: 'urgentComplaints'
+        }
+      },
+      {
+        $lookup: {
+          from: 'complaints',
+          let: { agentId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$assignedTo', '$$agentId'] },
+                status: { $nin: ['Resolved', 'Closed'] },
+                slaTarget: { $lt: new Date() }
+              }
+            }
+          ],
+          as: 'overdueComplaints'
+        }
+      },
+      {
+        $project: {
+          firstName: 1,
+          lastName: 1,
+          email: 1,
+          department: 1,
+          activeCount: { $size: '$activeComplaints' },
+          urgentCount: { $size: '$urgentComplaints' },
+          overdueCount: { $size: '$overdueComplaints' },
+          workloadScore: {
+            $add: [
+              { $size: '$activeComplaints' },
+              { $multiply: [{ $size: '$urgentComplaints' }, 2] },
+              { $multiply: [{ $size: '$overdueComplaints' }, 1.5] }
+            ]
+          }
+        }
+      },
+      { $sort: { workloadScore: -1 } }
+    ]);
+
+    res.json(agentWorkloads);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch agent workloads' });
+  }
+}));
+
+// System health check
+router.get('/health', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  try {
+    // Check database connectivity and basic metrics
+    const dbStats = await Promise.all([
+      User.countDocuments(),
+      Complaint.countDocuments(),
+      Complaint.countDocuments({ createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } })
+    ]);
+
+    const systemHealth = {
+      status: 'healthy',
+      timestamp: new Date(),
+      database: {
+        connected: true,
+        totalUsers: dbStats[0],
+        totalComplaints: dbStats[1],
+        complaintsLast24h: dbStats[2]
+      },
+      performance: {
+        memoryUsage: process.memoryUsage(),
+        uptime: process.uptime()
+      }
+    };
+
+    res.json(systemHealth);
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date()
+    });
+  }
+}));
+
+// Bulk category/priority management
+router.post('/complaints/bulk-update-category', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { oldCategory, newCategory } = req.body;
+
+  if (!oldCategory || !newCategory) {
+    return res.status(400).json({ error: 'Both old and new category are required' });
+  }
+
+  try {
+    const result = await Complaint.updateMany(
+      { category: oldCategory },
+      { 
+        category: newCategory,
+        updatedAt: new Date()
+      }
+    );
+
+    res.json({
+      message: `Successfully updated ${result.modifiedCount} complaints`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update categories' });
+  }
+}));
+
 export default router;

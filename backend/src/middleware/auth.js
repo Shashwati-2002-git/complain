@@ -10,19 +10,27 @@ const authenticate = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret-key');
-    const user = await User.findById(decoded.userId).select('-password');
+    
+    // The token might use either 'userId' or 'id' field based on how it was generated
+    const userId = decoded.userId || decoded.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid token format.' });
+    }
+    
+    const user = await User.findById(userId).select('-password');
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid token.' });
     }
 
-    if (!user.isActive) {
+    if (user.isActive === false) {  // Only check if explicitly false
       return res.status(401).json({ error: 'Account is deactivated.' });
     }
 
     req.user = user;
     next();
   } catch (error) {
+    console.error('Authentication error:', error.message);
     res.status(401).json({ error: 'Invalid token.' });
   }
 };

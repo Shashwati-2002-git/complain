@@ -163,6 +163,43 @@ const complaintSchema = new mongoose.Schema({
     },
     feedback: String,
     submittedAt: Date
+  },
+  // Added chat messages support for live communication between user and agent
+  messages: [{
+    sender: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    senderName: {
+      type: String,
+      required: true
+    },
+    senderRole: {
+      type: String,
+      enum: ['user', 'agent', 'admin', 'analytics'],
+      required: true
+    },
+    text: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [2000, 'Message cannot exceed 2000 characters']
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    isRead: {
+      type: Boolean,
+      default: false
+    }
+  }],
+  // Track agent availability for automatic assignment
+  agentStatus: {
+    type: String,
+    enum: ['available', 'busy', 'offline'],
+    default: 'available'
   }
 }, {
   timestamps: true,

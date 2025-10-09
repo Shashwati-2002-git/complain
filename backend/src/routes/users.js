@@ -199,4 +199,252 @@ router.get('/agents/:department', authenticate, authorize('admin', 'agent'), asy
   res.json(agents);
 }));
 
+// Get all users with pagination and filtering (admin only)
+router.get('/all', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { 
+    page = 1, 
+    limit = 10, 
+    role, 
+    isActive, 
+    department,
+    search,
+    sortBy = 'createdAt',
+    sortOrder = 'desc'
+  } = req.query;
+
+  // Build filter object
+  const filter = {};
+  if (role) filter.role = role;
+  if (isActive !== undefined) filter.isActive = isActive === 'true';
+  if (department) filter.department = department;
+  
+  // Search functionality
+  if (search) {
+    filter.$or = [
+      { firstName: { $regex: search, $options: 'i' } },
+      { lastName: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } }
+    ];
+  }
+
+  // Calculate pagination
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+
+  // Build sort object
+  const sort = {};
+  sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+  const users = await User.find(filter)
+    .select('-password')
+    .sort(sort)
+    .skip(skip)
+    .limit(parseInt(limit));
+
+  const total = await User.countDocuments(filter);
+
+  res.json({
+    users,
+    pagination: {
+      current: parseInt(page),
+      pages: Math.ceil(total / parseInt(limit)),
+      total
+    }
+  });
+}));
+
+// Create new user (admin only)
+router.post('/create', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { firstName, lastName, email, password, role, department } = req.body;
+
+  // Check if user already exists
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    return res.status(400).json({ error: 'User already exists with this email' });
+  }
+
+  const user = new User({
+    firstName,
+    lastName,
+    email,
+    password, // Will be hashed by pre-save middleware
+    role: role || 'user',
+    department: department || null,
+    isActive: true,
+    profile: {
+      avatar: '',
+      phone: '',
+      address: '',
+      bio: ''
+    },
+    preferences: {
+      emailNotifications: true,
+      smsNotifications: false,
+      language: 'en',
+      timezone: 'UTC'
+    }
+  });
+
+  await user.save();
+
+  // Remove password from response
+  const userResponse = user.toObject();
+  delete userResponse.password;
+
+  res.status(201).json({
+    message: 'User created successfully',
+    user: userResponse
+  });
+}));
+
+// Bulk user operations (admin only)
+router.patch('/bulk/activate', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { userIds, isActive } = req.body;
+
+  if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+    return res.status(400).json({ error: 'Please provide user IDs' });
+  }
+
+  const result = await User.updateMany(
+    { _id: { $in: userIds } },
+    { isActive: isActive !== false, updatedAt: new Date() }
+  );
+
+  res.json({
+    message: `${result.modifiedCount} users ${isActive !== false ? 'activated' : 'deactivated'} successfully`,
+    modifiedCount: result.modifiedCount
+  });
+}));
+
+// Update user role (admin only)
+router.patch('/:id/role', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { role, department } = req.body;
+
+  if (!['user', 'agent', 'admin'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  user.role = role;
+  if (department) user.department = department;
+  user.updatedAt = new Date();
+
+  await user.save();
+
+  const userResponse = user.toObject();
+  delete userResponse.password;
+
+  res.json({
+    message: 'User role updated successfully',
+    user: userResponse
+  });
+}));
+
+// Get user statistics (admin only)
+router.get('/stats/overview', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const [
+    totalUsers,
+    activeUsers,
+    usersByRole,
+    recentUsers
+  ] = await Promise.all([
+    User.countDocuments(),
+    User.countDocuments({ isActive: true }),
+    User.aggregate([
+      { $group: { _id: '$role', count: { $sum: 1 } } }
+    ]),
+    User.countDocuments({
+      createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+    })
+  ]);
+
+  const roleStats = usersByRole.reduce((acc, item) => {
+    acc[item._id] = item.count;
+    return acc;
+  }, {});
+
+  res.json({
+    totalUsers,
+    activeUsers,
+    inactiveUsers: totalUsers - activeUsers,
+    recentUsers,
+    roleBreakdown: {
+      users: roleStats.user || 0,
+      agents: roleStats.agent || 0,
+      admins: roleStats.admin || 0
+    }
+  });
+}));
+
+// Get agent performance metrics (admin only)
+router.get('/agents/performance', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { timeRange = '30' } = req.query;
+  const days = parseInt(timeRange);
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  const agentPerformance = await User.aggregate([
+    { $match: { role: 'agent', isActive: true } },
+    {
+      $lookup: {
+        from: 'complaints',
+        let: { agentId: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ['$assignedTo', '$$agentId'] },
+              createdAt: { $gte: startDate }
+            }
+          }
+        ],
+        as: 'assignedComplaints'
+      }
+    },
+    {
+      $lookup: {
+        from: 'complaints',
+        let: { agentId: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ['$assignedTo', '$$agentId'] },
+              status: { $in: ['Resolved', 'Closed'] },
+              createdAt: { $gte: startDate }
+            }
+          }
+        ],
+        as: 'resolvedComplaints'
+      }
+    },
+    {
+      $project: {
+        firstName: 1,
+        lastName: 1,
+        email: 1,
+        department: 1,
+        totalAssigned: { $size: '$assignedComplaints' },
+        totalResolved: { $size: '$resolvedComplaints' },
+        resolutionRate: {
+          $cond: [
+            { $eq: [{ $size: '$assignedComplaints' }, 0] },
+            0,
+            {
+              $multiply: [
+                { $divide: [{ $size: '$resolvedComplaints' }, { $size: '$assignedComplaints' }] },
+                100
+              ]
+            }
+          ]
+        }
+      }
+    },
+    { $sort: { resolutionRate: -1, totalResolved: -1 } }
+  ]);
+
+  res.json(agentPerformance);
+}));
+
 export default router;

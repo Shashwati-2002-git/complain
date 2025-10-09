@@ -10,7 +10,7 @@ A comprehensive Node.js backend API for managing customer complaints with AI-pow
 - **Real-time Updates**: WebSocket support for live notifications and updates
 - **Analytics Dashboard**: Comprehensive reporting and metrics
 - **SLA Management**: Automatic tracking and breach notifications
-- **Multi-role Support**: Different interfaces for users, agents, and administrators
+- **Multi-role Support**: Different interfaces for users, agents, administrators, and analytics managers
 
 ## Tech Stack
 
@@ -161,7 +161,7 @@ Using Socket.IO, the system provides:
   lastName: String,
   email: String (unique),
   password: String (hashed),
-  role: String (user|agent|admin),
+  role: String (user|agent|admin|analytics),
   department: String,
   isActive: Boolean,
   profile: Object,

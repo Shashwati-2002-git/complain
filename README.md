@@ -201,7 +201,7 @@ complease/                  # Root project folder
 ### 🔐 **Authentication & Security**
 - **JWT Authentication**: Secure token-based authentication
 - **Google OAuth Integration**: One-click login with Google accounts
-- **Role-based Access Control**: User, Agent, and Admin roles with specific permissions
+- **Role-based Access Control**: User, Agent, Admin, and Analytics roles with specific permissions
 - **Password Security**: Encrypted password storage with bcrypt
 - **Rate Limiting**: Protection against abuse and spam
 

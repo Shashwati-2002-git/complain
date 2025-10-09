@@ -1,5 +1,6 @@
 import express from 'express';
 import { Complaint } from '../models/Complaint.js';
+import { User } from '../models/User.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { validateComplaint, validateComplaintUpdate } from '../validators/complaintValidators.js';
@@ -115,7 +116,7 @@ router.post('/', authenticate, asyncHandler(async (req, res) => {
   slaTarget.setHours(slaTarget.getHours() + slaHours[aiAnalysis.priority]);
 
   const complaint = new Complaint({
-    userId: req.user._id,
+    user: req.user._id, // Updated to match the schema field name
     title,
     description,
     category: category || aiAnalysis.category,
@@ -132,16 +133,39 @@ router.post('/', authenticate, asyncHandler(async (req, res) => {
     },
     updates: [{
       message: 'Complaint has been created and classified automatically.',
-      author: 'System',
-      authorId: req.user._id,
-      timestamp: new Date(),
-      type: 'status_change',
+      updatedBy: req.user._id, // Updated to match the schema field
+      updateType: 'status_change',
+      createdAt: new Date(),
       isInternal: false
     }]
   });
 
+  // Save the complaint first to get its ID
   await complaint.save();
-  res.status(201).json(complaint);
+  
+  // Import the ticket assignment service
+  const { autoAssignTicket } = await import('../services/ticketAssignmentService.js');
+  
+  try {
+    // Attempt to auto-assign the ticket to an available agent
+    const { assignedAgent } = await autoAssignTicket(complaint._id);
+    
+    // If an agent was assigned, update the response
+    if (assignedAgent) {
+      console.log(`Complaint ${complaint.complaintId} assigned to ${assignedAgent.name}`);
+    } else {
+      console.log(`No available agent to handle complaint ${complaint.complaintId}`);
+    }
+  } catch (err) {
+    console.error('Error assigning ticket:', err);
+    // Continue even if auto-assignment fails
+  }
+  
+  // Get updated complaint after assignment
+  const updatedComplaint = await Complaint.findById(complaint._id)
+    .populate('assignedTo', 'name email');
+  
+  res.status(201).json(updatedComplaint);
 }));
 
 // Update complaint status
@@ -179,20 +203,40 @@ router.patch('/:id/status', authenticate, authorize('agent', 'admin'), asyncHand
   complaint.updates.push(updateRecord);
 
   // Calculate resolution time if resolved
-  if (status === 'Resolved' && !complaint.metrics.resolutionTime) {
-    complaint.metrics.resolutionTime = 
-      (new Date().getTime() - complaint.createdAt.getTime()) / (1000 * 60 * 60); // hours
+  if (status === 'Resolved') {
+    // Store resolution details
+    complaint.resolution = {
+      description: message || 'Complaint resolved',
+      resolvedBy: req.user._id,
+      resolvedAt: new Date()
+    };
+    
+    // If this agent resolved it, check if they should be marked available again
+    if (complaint.assignedTo && complaint.assignedTo.toString() === req.user._id.toString()) {
+      // Import the agent service
+      const { refreshAgentAvailability } = await import('../services/agentService.js');
+      
+      try {
+        // This will check if agent has any remaining active complaints
+        // and update their availability accordingly
+        await refreshAgentAvailability(req.user._id);
+      } catch (err) {
+        console.error('Error updating agent availability:', err);
+      }
+    }
   }
 
   await complaint.save();
 
   // Emit socket event for real-time updates
   const io = req.app.get('io');
-  io.emit('complaintUpdated', {
-    complaintId: complaint._id,
-    status: complaint.status,
-    updatedBy: req.user._id
-  });
+  if (io) {
+    io.emit('complaintUpdated', {
+      complaintId: complaint._id,
+      status: complaint.status,
+      updatedBy: req.user._id
+    });
+  }
 
   res.json(complaint);
 }));
@@ -358,6 +402,281 @@ router.post('/:id/feedback', authenticate, asyncHandler(async (req, res) => {
   await complaint.save();
 
   res.json({ message: 'Feedback submitted successfully', feedback: complaint.feedback });
+}));
+
+// Bulk operations for admin dashboard
+router.patch('/bulk/assign', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { complaintIds, assignedTo, assignedTeam } = req.body;
+
+  if (!complaintIds || !Array.isArray(complaintIds) || complaintIds.length === 0) {
+    return res.status(400).json({ error: 'Please provide complaint IDs' });
+  }
+
+  const updateData = { updatedAt: new Date() };
+  if (assignedTo) updateData.assignedTo = assignedTo;
+  if (assignedTeam) updateData.assignedTeam = assignedTeam;
+
+  const result = await Complaint.updateMany(
+    { _id: { $in: complaintIds } },
+    updateData
+  );
+
+  // Add updates to each complaint
+  await Promise.all(complaintIds.map(async (id) => {
+    await Complaint.findByIdAndUpdate(id, {
+      $push: {
+        updates: {
+          message: `Complaint bulk assigned to ${assignedTo ? 'agent' : 'team'}`,
+          author: `${req.user.firstName} ${req.user.lastName}`,
+          authorId: req.user._id,
+          timestamp: new Date(),
+          type: 'assignment',
+          isInternal: false
+        }
+      }
+    });
+  }));
+
+  res.json({ 
+    message: `${result.modifiedCount} complaints updated successfully`,
+    modifiedCount: result.modifiedCount 
+  });
+}));
+
+// Bulk status update
+router.patch('/bulk/status', authenticate, authorize('admin', 'agent'), asyncHandler(async (req, res) => {
+  const { complaintIds, status, message } = req.body;
+
+  if (!complaintIds || !Array.isArray(complaintIds) || complaintIds.length === 0) {
+    return res.status(400).json({ error: 'Please provide complaint IDs' });
+  }
+
+  if (!status) {
+    return res.status(400).json({ error: 'Status is required' });
+  }
+
+  const result = await Complaint.updateMany(
+    { _id: { $in: complaintIds } },
+    { 
+      status, 
+      updatedAt: new Date(),
+      ...(status === 'Resolved' && { resolvedAt: new Date() })
+    }
+  );
+
+  // Add updates to each complaint
+  await Promise.all(complaintIds.map(async (id) => {
+    await Complaint.findByIdAndUpdate(id, {
+      $push: {
+        updates: {
+          message: message || `Status updated to ${status}`,
+          author: `${req.user.firstName} ${req.user.lastName}`,
+          authorId: req.user._id,
+          timestamp: new Date(),
+          type: 'status_change',
+          isInternal: false
+        }
+      }
+    });
+  }));
+
+  res.json({ 
+    message: `${result.modifiedCount} complaints updated successfully`,
+    modifiedCount: result.modifiedCount 
+  });
+}));
+
+// AI-assisted auto-assignment
+router.post('/auto-assign', authenticate, authorize('admin'), asyncHandler(async (req, res) => {
+  const { complaintId, teamId } = req.body;
+
+  const complaint = await Complaint.findById(complaintId);
+  if (!complaint) {
+    return res.status(404).json({ error: 'Complaint not found' });
+  }
+
+  // Simple auto-assignment logic based on workload
+  const agents = await User.find({ 
+    role: 'agent', 
+    ...(teamId && { department: teamId }),
+    isActive: true 
+  });
+
+  if (agents.length === 0) {
+    return res.status(400).json({ error: 'No available agents found' });
+  }
+
+  // Get current workload for each agent
+  const workloads = await Promise.all(agents.map(async (agent) => {
+    const activeComplaints = await Complaint.countDocuments({
+      assignedTo: agent._id,
+      status: { $in: ['Open', 'In Progress'] }
+    });
+    return { agent, workload: activeComplaints };
+  }));
+
+  // Find agent with lowest workload
+  const leastBusyAgent = workloads.reduce((min, current) => 
+    current.workload < min.workload ? current : min
+  );
+
+  // Assign complaint to least busy agent
+  complaint.assignedTo = leastBusyAgent.agent._id;
+  complaint.assignedTeam = leastBusyAgent.agent.department;
+  complaint.updatedAt = new Date();
+  complaint.updates.push({
+    message: `Auto-assigned to ${leastBusyAgent.agent.firstName} ${leastBusyAgent.agent.lastName}`,
+    author: 'AI System',
+    authorId: req.user._id,
+    timestamp: new Date(),
+    type: 'assignment',
+    isInternal: false
+  });
+
+  await complaint.save();
+
+  res.json({ 
+    message: 'Complaint auto-assigned successfully',
+    assignedTo: {
+      id: leastBusyAgent.agent._id,
+      name: `${leastBusyAgent.agent.firstName} ${leastBusyAgent.agent.lastName}`,
+      workload: leastBusyAgent.workload
+    }
+  });
+}));
+
+// Add internal notes (for agents and admins)
+router.post('/:id/internal-notes', authenticate, authorize('agent', 'admin'), asyncHandler(async (req, res) => {
+  const { note } = req.body;
+
+  if (!note || note.trim().length === 0) {
+    return res.status(400).json({ error: 'Note content is required' });
+  }
+
+  const complaint = await Complaint.findById(req.params.id);
+  if (!complaint) {
+    return res.status(404).json({ error: 'Complaint not found' });
+  }
+
+  // Check if agent is assigned to this complaint or is admin
+  if (req.user.role === 'agent' && complaint.assignedTo?.toString() !== req.user._id.toString()) {
+    return res.status(403).json({ error: 'You can only add notes to complaints assigned to you' });
+  }
+
+  const internalNote = {
+    message: note,
+    author: `${req.user.firstName} ${req.user.lastName}`,
+    authorId: req.user._id,
+    timestamp: new Date(),
+    type: 'internal_note',
+    isInternal: true
+  };
+
+  complaint.updates.push(internalNote);
+  complaint.updatedAt = new Date();
+  await complaint.save();
+
+  res.json({ 
+    message: 'Internal note added successfully',
+    note: internalNote
+  });
+}));
+
+// Get internal notes for a complaint
+router.get('/:id/internal-notes', authenticate, authorize('agent', 'admin'), asyncHandler(async (req, res) => {
+  const complaint = await Complaint.findById(req.params.id);
+  if (!complaint) {
+    return res.status(404).json({ error: 'Complaint not found' });
+  }
+
+  // Check if agent is assigned to this complaint or is admin
+  if (req.user.role === 'agent' && complaint.assignedTo?.toString() !== req.user._id.toString()) {
+    return res.status(403).json({ error: 'You can only view notes for complaints assigned to you' });
+  }
+
+  const internalNotes = complaint.updates.filter(update => update.isInternal === true);
+
+  res.json({ internalNotes });
+}));
+
+// Escalate complaint
+router.patch('/:id/escalate', authenticate, authorize('agent', 'admin'), asyncHandler(async (req, res) => {
+  const { reason, escalatedTo } = req.body;
+
+  const complaint = await Complaint.findById(req.params.id);
+  if (!complaint) {
+    return res.status(404).json({ error: 'Complaint not found' });
+  }
+
+  complaint.isEscalated = true;
+  complaint.escalation = {
+    reason: reason || 'Manual escalation',
+    escalatedBy: req.user._id,
+    escalatedAt: new Date(),
+    escalatedTo: escalatedTo || null
+  };
+  complaint.priority = 'Urgent'; // Auto-upgrade priority
+  complaint.updatedAt = new Date();
+  complaint.updates.push({
+    message: `Complaint escalated: ${reason || 'Manual escalation'}`,
+    author: `${req.user.firstName} ${req.user.lastName}`,
+    authorId: req.user._id,
+    timestamp: new Date(),
+    type: 'escalation',
+    isInternal: false
+  });
+
+  await complaint.save();
+
+  res.json({ 
+    message: 'Complaint escalated successfully',
+    escalation: complaint.escalation
+  });
+}));
+
+// Get dashboard statistics for current user
+router.get('/stats/dashboard', authenticate, asyncHandler(async (req, res) => {
+  let matchFilter = {};
+
+  // Role-based filtering
+  if (req.user.role === 'user') {
+    matchFilter.userId = req.user._id;
+  } else if (req.user.role === 'agent') {
+    matchFilter.assignedTo = req.user._id;
+  }
+  // Admin sees all complaints
+
+  const [
+    totalComplaints,
+    openComplaints,
+    inProgressComplaints,
+    resolvedComplaints,
+    escalatedComplaints,
+    overdueComplaints
+  ] = await Promise.all([
+    Complaint.countDocuments(matchFilter),
+    Complaint.countDocuments({ ...matchFilter, status: 'Open' }),
+    Complaint.countDocuments({ ...matchFilter, status: 'In Progress' }),
+    Complaint.countDocuments({ ...matchFilter, status: 'Resolved' }),
+    Complaint.countDocuments({ ...matchFilter, isEscalated: true }),
+    Complaint.countDocuments({ 
+      ...matchFilter, 
+      status: { $nin: ['Resolved', 'Closed'] },
+      slaTarget: { $lt: new Date() }
+    })
+  ]);
+
+  const resolutionRate = totalComplaints > 0 ? ((resolvedComplaints / totalComplaints) * 100).toFixed(1) : 0;
+
+  res.json({
+    totalComplaints,
+    openComplaints,
+    inProgressComplaints,
+    resolvedComplaints,
+    escalatedComplaints,
+    overdueComplaints,
+    resolutionRate: parseFloat(resolutionRate)
+  });
 }));
 
 export default router;
