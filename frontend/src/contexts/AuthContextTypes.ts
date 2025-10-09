@@ -43,6 +43,7 @@ export interface AuthContextType {
   validateSession: () => Promise<boolean>;
   // OTP verification related props
   pendingVerification: PendingVerification | null;
+  isVerificationPending: boolean;
   verifyOTP: (email: string, otp: string) => Promise<boolean>;
   resendOTP: (email: string) => Promise<boolean>;
   cancelVerification: () => void;

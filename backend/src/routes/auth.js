@@ -15,6 +15,8 @@ import {
   verifyOTP,
   resendOTP
 } from "../controllers/authController.js";
+import { validateSession } from "../controllers/sessionController.js";
+import { authenticate } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -26,6 +28,9 @@ router.post("/refresh", refreshToken);
 // OTP verification
 router.post("/verify-otp", verifyOTP);
 router.post("/resend-otp", resendOTP);
+
+// Session validation
+router.get("/validate-session", authenticate, validateSession);
 
 // Google OAuth login
 router.post("/google", googleLogin);

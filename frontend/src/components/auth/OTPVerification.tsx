@@ -61,15 +61,43 @@ export function OTPVerification({ email, onVerifySuccess, onBack }: OTPVerificat
         return;
       }
 
+      console.log('OTP verification successful, server response:', data);
+      
+      // Ensure we have user data and role
+      if (!data.user || !data.token) {
+        setError('Invalid response from server. Missing user data or token.');
+        return;
+      }
+      
       // Store authentication data from successful verification
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
       setSuccess(true);
       
+      // Get user role from the response data to determine which dashboard to go to
+      const userRole = data.user?.role || 'user';
+      console.log('User role from OTP verification:', userRole);
+      
       // Small delay to show success message before proceeding
       setTimeout(() => {
+        // Call the success handler first
         onVerifySuccess();
+        
+        try {
+          // Ensure we clear any stale session data before redirecting
+          sessionStorage.removeItem('dashboard_loaded');
+          
+          // Set a flag to indicate we're coming from OTP verification
+          sessionStorage.setItem('from_otp_verification', 'true');
+          
+          console.log('OTP verification successful, redirecting to dashboard');
+          window.location.href = '/dashboard';
+        } catch (error) {
+          console.error('Error during dashboard redirect:', error);
+          // Fallback direct navigation as last resort
+          window.location.replace('/dashboard');
+        }
       }, 1500);
       
     } catch (error) {

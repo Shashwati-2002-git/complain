@@ -282,7 +282,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         if (freshToken) newSocket.auth = { token: freshToken };
       });
     },
-    [checkTokenExpiration, logout, refreshToken, user?.role]
+    // Remove dependencies that cause circular updates and only depend on role changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user?.role]
   );
 
   // -------------------- Socket Actions --------------------
@@ -432,22 +434,42 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         return null;
       }
       
-      // Use dedicated socket URL from environment variables, or fallback to API URL
-      const baseURL = import.meta.env.VITE_SOCKET_SERVER_URL || 'http://localhost:5001';
+      // First validate token to avoid connection attempts with invalid tokens
+    try {
+      // Simple client-side check for token validity
+      const tokenParts = token.split('.');
+      if (tokenParts.length !== 3) {
+        console.error('Token validation failed, not connecting socket');
+        return null;
+      }
       
-      console.log('🔌 Socket connecting to:', baseURL);
-        
-      const socketOptions = {
-        auth: {
-          token // Simplified to just include the token
-        },
-        transports: ['websocket', 'polling'], 
-        reconnection: true,
-        reconnectionAttempts: 3,
-        reconnectionDelay: 1000,
-        timeout: 10000,
-        forceNew: true
-      };
+      // Check if token is expired
+      const payload = JSON.parse(atob(tokenParts[1]));
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        console.error('Token validation failed (expired), not connecting socket');
+        return null;
+      }
+    } catch (error) {
+      console.error('Token validation failed, not connecting socket:', error);
+      return null;
+    }
+    
+    // Use dedicated socket URL from environment variables, or fallback to API URL
+    const baseURL = import.meta.env.VITE_SOCKET_SERVER_URL || 'http://localhost:5001';
+    
+    console.log('🔌 Socket connecting to:', baseURL);
+      
+    const socketOptions = {
+      auth: {
+        token // Simplified to just include the token
+      },
+      transports: ['websocket', 'polling'], 
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 1000,
+      timeout: 10000,
+      forceNew: true
+    };
       
       console.log('Initializing socket with options:', socketOptions);
       
@@ -461,14 +483,21 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         return null;
       }
     },
-    [setupSocketListeners]
+    // setupSocketListeners is stable since we fixed its dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
+
+  // Track socket connection attempts to prevent loops
+  const [connectionAttemptCount, setConnectionAttemptCount] = useState<number>(0);
+  const [lastConnectionAttempt, setLastConnectionAttempt] = useState<number>(0);
 
   // -------------------- Manage Lifecycle --------------------
   useEffect(() => {
     // Track if component is still mounted for async operations
     let isMounted = true;
     
+    // If no user, disconnect and clean up
     if (!user) {
       if (socket) {
         console.log('🛑 User not available, disconnecting socket');
@@ -479,86 +508,91 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       return () => { isMounted = false; };
     }
 
-    // Prevent multiple socket connections
+    // If socket already connected, don't reconnect
     if (socket && socket.connected) {
       console.log('Socket already connected, not creating a new one');
       return () => { isMounted = false; };
     }
     
-    // Close any existing connections before creating new ones
+    // Enforce a minimum time between connection attempts to prevent rapid reconnections
+    const now = Date.now();
+    const MIN_RECONNECT_INTERVAL = 10000; // 10 seconds between attempts
+    
+    if (now - lastConnectionAttempt < MIN_RECONNECT_INTERVAL) {
+      console.log(`Throttling socket connection - last attempt was ${Math.round((now - lastConnectionAttempt)/1000)}s ago`);
+      return () => { isMounted = false; };
+    }
+    
+    // Limit total number of connection attempts to prevent infinite loops
+    const MAX_ATTEMPTS = 3;
+    if (connectionAttemptCount >= MAX_ATTEMPTS) {
+      console.error(`Max connection attempts (${MAX_ATTEMPTS}) reached, giving up`);
+      return () => { isMounted = false; };
+    }
+
+    // Clean up any existing socket that's not connected
     if (socket && !socket.connected) {
       console.log('Cleaning up existing disconnected socket');
       socket.disconnect();
       setSocket(null);
     }
     
-    let socketInstance: Socket | null = null;
-    let connectionAttempts = 0;
-    const MAX_ATTEMPTS = 3;
-    
-    // Use localStorage to track connection attempts between renders
-    const lastAttemptTime = parseInt(localStorage.getItem('socketLastAttemptTime') || '0');
-    const currentTime = Date.now();
-    
-    // Check if we've recently detected a duplicate connection
-    const duplicateDetectedTime = parseInt(localStorage.getItem('socketDuplicateDetected') || '0');
-    const isDuplicateRecent = (currentTime - duplicateDetectedTime) < 10000; // 10 seconds
-    
-    if (isDuplicateRecent) {
-      console.log('Recently detected as duplicate connection. Waiting before reconnecting.');
-      return () => { isMounted = false; };
-    }
-    
-    // If we've tried recently (within 5 seconds), don't try again immediately
-    if (currentTime - lastAttemptTime < 5000) {
-      console.log('Throttling connection attempt - tried too recently');
-      return () => { isMounted = false; };
-    }
-
+    // Initialize socket connection process
     const initializeSocket = async () => {
-      // Update last attempt time
-      localStorage.setItem('socketLastAttemptTime', currentTime.toString());
+      // Track this attempt
+      setLastConnectionAttempt(now);
+      setConnectionAttemptCount(prev => prev + 1);
       
-      // Prevent excessive connection attempts
-      if (connectionAttempts >= MAX_ATTEMPTS) {
-        console.error('Max connection attempts reached, giving up');
-        return;
-      }
+      console.log(`Socket connection attempt ${connectionAttemptCount + 1}/${MAX_ATTEMPTS}`);
       
-      connectionAttempts++;
-      console.log(`Socket connection attempt ${connectionAttempts}/${MAX_ATTEMPTS}`);
-      
-      const isValid = await checkTokenExpiration();
-      if (!isValid) {
-        console.error('Token validation failed, not connecting socket');
-        return;
-      }
-
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('No token available, not connecting socket');
-        return;
-      }
-
-      // Wait a moment before connecting to avoid rapid reconnection issues
-      setTimeout(() => {
-        if (isMounted) {
-          socketInstance = connectSocket(token);
+      try {
+        // First validate the token without calling the API
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('No token available, not connecting socket');
+          return;
         }
-      }, 1000);
+        
+        // Simple client-side token validation to avoid unnecessary API calls
+        try {
+          const tokenParts = token.split('.');
+          if (tokenParts.length !== 3) {
+            console.error('Invalid token format, not connecting socket');
+            return;
+          }
+          
+          const payload = JSON.parse(atob(tokenParts[1]));
+          if (payload.exp && payload.exp * 1000 < Date.now()) {
+            console.error('Token expired, not connecting socket');
+            return;
+          }
+        } catch (error) {
+          console.error('Token validation failed, not connecting socket:', error);
+          return;
+        }
+        
+        // Create the socket connection with delay to prevent rapid reconnects
+        setTimeout(() => {
+          if (isMounted) {
+            const newSocket = connectSocket(token);
+            if (newSocket) {
+              console.log('Socket connection initiated');
+            }
+          }
+        }, 1000);
+      } catch (error) {
+        console.error('Socket initialization error:', error);
+      }
     };
 
     initializeSocket();
 
     return () => {
       isMounted = false;
-      if (socketInstance) {
-        console.log('🛑 Disconnecting socket on cleanup');
-        socketInstance.removeAllListeners();
-        socketInstance.disconnect();
-      }
     };
-  }, [user, connectSocket, checkTokenExpiration, socket]);
+  // Carefully control when this effect runs to prevent infinite loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // -------------------- Helper Functions --------------------
   // Socket action functions are defined above

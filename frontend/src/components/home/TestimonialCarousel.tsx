@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface TestimonialProps {
   autoScrollInterval?: number;
@@ -8,34 +7,54 @@ interface TestimonialProps {
 
 const testimonials = [
   {
-    title: "RAPID RESOLUTION BRINGS CUSTOMER SATISFACTION.",
-    person: "Michael Rodriguez",
-    role: "Customer Service Director",
-    description: "Learn More About Our Approach",
+    title: "", // Removed text content
+    person: "",
+    role: "",
+    description: "",
     linkTo: "/approach",
     linkColor: "text-green-600 hover:text-green-800",
-    image: "/Slider.png",
+    image: "/Slider.png", // Updated path with leading slash for public directory
     imageAlt: "Customer service representative",
   },
   {
-    title: "TEAMWORK MAKES THE DREAM WORK.",
-    person: "Sarah Chen",
-    role: "Project Lead",
-    description: "Learn About Collaboration",
+    title: "", // Removed text content
+    person: "",
+    role: "",
+    description: "",
     linkTo: "/collaboration",
     linkColor: "text-blue-600 hover:text-blue-800",
-    image: "/sliderimage2.png",
+    image: "/sliderimage2.png", // Updated path
     imageAlt: "Team meeting with analytics",
   },
   {
-    title: "IDEAS ARE THE BEGINNINGS OF ALL ENTERPRISES.",
-    person: "Lakasmi Gupta",
-    role: "Innovation Lead",
-    description: "Spark Innovation",
+    title: "", // Removed text content
+    person: "",
+    role: "",
+    description: "",
     linkTo: "/innovation",
     linkColor: "text-purple-600 hover:text-purple-800",
-    image: "/sliderimage3.png",
+    image: "/sliderimage3.png", // Updated path
     imageAlt: "Innovation team collaborating",
+  },
+  {
+    title: "", // Removed text content
+    person: "",
+    role: "",
+    description: "",
+    linkTo: "/solutions",
+    linkColor: "text-blue-600 hover:text-blue-800",
+    image: "/exploreinsight.png", // Using one of the provided images
+    imageAlt: "Analytics dashboard meeting",
+  },
+  {
+    title: "", // Removed text content
+    person: "",
+    role: "",
+    description: "",
+    linkTo: "/technology",
+    linkColor: "text-purple-600 hover:text-purple-800",
+    image: "/exploreinsight2.png", // Using one of the provided images
+    imageAlt: "AI-powered data visualization",
   }
 ];
 
@@ -122,56 +141,32 @@ const TestimonialCarousel: React.FC<TestimonialProps> = ({ autoScrollInterval = 
   };
 
   return (
-    <div className="relative w-full overflow-hidden" role="region" aria-label="Testimonials carousel">
+    <div className="relative w-full overflow-hidden" style={{ height: '600px' }} role="region" aria-label="Image carousel">
       {/* Carousel Container */}
       <div 
         ref={carouselRef}
-        className="flex transition-transform duration-500 ease-in-out"
+        className="flex transition-transform duration-500 ease-in-out h-full"
         style={{ transform: `translateX(-${currentSlide * 100}%)` }}
         aria-live="polite"
       >
         {testimonials.map((testimonial, index) => (
           <div 
             key={index} 
-            className="carousel-slide min-w-full flex-shrink-0"
+            className="carousel-slide min-w-full flex-shrink-0 h-full"
             aria-hidden={currentSlide !== index ? "true" : "false"}
             role="tabpanel"
             id={`slide-${index}`}
           >
-            <div className="bg-white rounded-xl overflow-hidden shadow-lg">
-              <div className="flex flex-col md:flex-row">
-                {/* Left Content Panel */}
-                <div className="md:w-1/2 bg-gray-100 p-12 md:p-16 flex flex-col justify-center">
-                  <h3 className="text-3xl font-bold text-gray-900 mb-4">
-                    {testimonial.title}
-                  </h3>
-                  <p className="text-gray-700 text-lg mb-2 font-medium">{testimonial.person}</p>
-                  <p className="text-gray-600 mb-8">{testimonial.role}</p>
-                  
-                  <Link
-                    to={testimonial.linkTo}
-                    className={`inline-flex items-center font-semibold group ${testimonial.linkColor}`}
-                  >
-                    {testimonial.description} <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                  </Link>
-                </div>
-                
-                {/* Right Image Panel */}
-                <div className="md:w-1/2">
-                  <div className="h-full relative">
-                    <img 
-                      src={testimonial.image} 
-                      alt={testimonial.imageAlt} 
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    <div 
-                      className="absolute right-4 bottom-4 w-8 h-8 bg-white rounded-full flex items-center justify-center opacity-70"
-                      aria-hidden="true"
-                    >
-                      <div className="w-4 h-4 bg-gray-100 rotate-45"></div>
-                    </div>
-                  </div>
+            <div className="bg-white rounded-xl overflow-hidden shadow-lg h-full">
+              <div className="flex h-full">
+                {/* Full-Width Image Panel (removed text content panel) */}
+                <div className="w-full relative overflow-hidden">
+                  <img 
+                    src={testimonial.image} 
+                    alt={testimonial.imageAlt} 
+                    className="w-full h-full object-cover object-center"
+                    loading="lazy"
+                  />
                 </div>
               </div>
             </div>

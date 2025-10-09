@@ -72,6 +72,13 @@ export function useTokenValidation() {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
       console.log('Attempting to refresh token at:', apiUrl);
 
+      // Check if token exists first - if not, return early
+      const currentToken = localStorage.getItem('token');
+      if (!currentToken) {
+        console.log('No token to refresh');
+        return false;
+      }
+
       // Prevent multiple simultaneous refresh attempts
       const lastRefreshTime = parseInt(localStorage.getItem('lastTokenRefresh') || '0');
       const now = Date.now();
@@ -134,6 +141,9 @@ export function useTokenValidation() {
     }
   }, [logout, validateToken]);
 
+  // Track last check time to prevent repeated validation
+  const [lastCheckTime, setLastCheckTime] = useState<number>(0);
+
   /**
    * Check if token is about to expire (within 5 minutes) and refresh if needed
    */
@@ -143,6 +153,19 @@ export function useTokenValidation() {
       console.log('No token found in localStorage');
       return false;
     }
+
+    // Throttle checks to prevent too many API calls
+    const now = Date.now();
+    const MIN_CHECK_INTERVAL = 10000; // 10 seconds minimum between checks
+    
+    if (now - lastCheckTime < MIN_CHECK_INTERVAL) {
+      console.log(`Throttling token check - last check was ${Math.round((now - lastCheckTime)/1000)}s ago`);
+      // Return true for successful validation to prevent cascading failures
+      return true;
+    }
+    
+    // Update last check time
+    setLastCheckTime(now);
 
     try {
       const parts = token.split('.');
@@ -186,7 +209,7 @@ export function useTokenValidation() {
       console.error('Error checking token expiration:', error);
       return false;
     }
-  }, [refreshToken]);
+  }, [refreshToken, lastCheckTime]);
 
   /**
    * On mount: validate token and attempt refresh if invalid
@@ -205,7 +228,9 @@ export function useTokenValidation() {
         logout();
       });
     }
-  }, [validateToken, refreshToken, logout]);
+  // Only run this effect once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     isTokenValid,

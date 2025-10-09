@@ -18,6 +18,11 @@ console.log('=== QuickFix Complaint Management System ===');
 console.log('Starting server with Socket.IO real-time updates');
 console.log('Node environment:', process.env.NODE_ENV);
 
+// Generate a unique server session ID on startup
+// This is used to detect server restarts and force client re-authentication
+global.SERVER_SESSION_ID = `session-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+console.log('Server session ID:', global.SERVER_SESSION_ID);
+
 // Connect to MongoDB
 connectDB();
 

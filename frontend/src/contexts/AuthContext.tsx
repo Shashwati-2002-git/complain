@@ -9,6 +9,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [serverSessionId, setServerSessionId] = useState<string | null>(null);
 
+  // Tracking the last validation time to prevent excessive API calls
+  const [lastValidationTime, setLastValidationTime] = useState<number>(0);
+  
   // Validate session with the backend to check if token is valid and server is the same
   const validateSession = useCallback(async (): Promise<boolean> => {
     try {
@@ -27,43 +30,97 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         return false;
       }
+      
+      // Throttle validate-session calls to prevent resource exhaustion
+      const now = Date.now();
+      const MIN_INTERVAL = 5000; // 5 seconds minimum between validation calls
+      
+      if (now - lastValidationTime < MIN_INTERVAL) {
+        console.log("Skipping session validation - throttled to prevent resource exhaustion");
+        return true; // Assume valid if we recently validated
+      }
+      
+      // Update last validation time
+      setLastValidationTime(now);
 
       // Validate with the server
-      const response = await fetch(`${API_BASE_URL}/auth/validate-session`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        console.log("Session validation failed with status:", response.status);
-        tokenService.clearAuthData();
-        setUser(null);
-        return false;
-      }
-
-      const data = await response.json();
+      let response;
+      let data;
       
-      // Check if server has restarted by comparing session IDs
-      if (serverSessionId && data.sessionId !== serverSessionId) {
-        console.log("Server has restarted, forcing re-login");
-        tokenService.clearAuthData();
-        setUser(null);
-        return false;
+      try {
+        // Add cache-busting parameter to prevent browser caching
+        const cacheBuster = `?_=${Date.now()}`;
+        response = await fetch(`${API_BASE_URL}/auth/validate-session${cacheBuster}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          // Add signal to abort request after timeout
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        });
+
+        if (!response.ok) {
+          console.log("Session validation failed with status:", response.status);
+          
+          // Only clear auth data for unauthorized errors
+          // For server errors or 404s, we'll continue using the client-side validation
+          if (response.status === 401 || response.status === 403) {
+            tokenService.clearAuthData();
+            setUser(null);
+            return false;
+          }
+          
+          // For other errors like 404 (endpoint not found), we'll assume the token is valid
+          // if it passed the client-side validation earlier
+          console.log("Server endpoint unavailable, falling back to client-side validation");
+          return true;
+        }
+        
+        data = await response.json();
+      } catch (error) {
+        // Handle network errors - continue with client-side validation
+        console.warn("Network error during session validation, using client-side validation:", error);
+        return true;
       }
       
-      // Store the server session ID for future comparisons
-      setServerSessionId(data.sessionId);
-      tokenService.setServerSessionId(data.sessionId);
+      // Only process server session ID if we got valid data
+      if (data) {
+        // Check if server has restarted by comparing session IDs
+        if (serverSessionId && data.sessionId !== serverSessionId) {
+          console.log("Server has restarted, forcing re-login");
+          tokenService.clearAuthData();
+          setUser(null);
+          return false;
+        }
+        
+        // Store the server session ID for future comparisons
+        if (data.sessionId) {
+          setServerSessionId(data.sessionId);
+          tokenService.setServerSessionId(data.sessionId);
+        }
+      }
+      
+      // Make sure user state is set if we have a valid token but no user object
+      if (!user) {
+        const storedUserStr = localStorage.getItem("user");
+        if (storedUserStr) {
+          try {
+            const storedUser = JSON.parse(storedUserStr);
+            console.log("Restoring user from localStorage during session validation:", storedUser);
+            setUser(storedUser);
+          } catch (err) {
+            console.error("Error parsing stored user data:", err);
+          }
+        }
+      }
       
       return true;
     } catch (error) {
       console.error("Session validation error:", error);
       return false;
     }
-  }, [serverSessionId]);
+  }, [serverSessionId, user, lastValidationTime]);
 
   // Load user from localStorage and validate session
   useEffect(() => {
@@ -107,7 +164,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     // Clean up interval on unmount
     return () => clearInterval(intervalId);
-  }, [validateSession]);
+  // Only run this effect once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isAuthenticated = !!user;
   
@@ -383,6 +442,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!response.ok) return false;
       const data = await response.json();
+      
+      console.log("OTP verification response:", data);
+
+      // Ensure we have all required user data
+      if (!data.user || !data.token) {
+        console.error("Invalid user data or token in OTP verification response");
+        return false;
+      }
 
       const userData: User = {
         id: data.user.id,
@@ -390,8 +457,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastName: data.user.lastName || data.user.name.split(" ").slice(1).join(" ") || "",
         name: data.user.name,
         email: data.user.email,
-        role: data.user.role,
+        role: data.user.role || "user", // Default to user if role is missing
       };
+      
+      console.log("Setting user data after OTP verification:", userData);
 
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(userData));
@@ -445,6 +514,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         validateSession,
         // OTP verification related props
         pendingVerification,
+        isVerificationPending,
         verifyOTP,
         resendOTP,
         cancelVerification,

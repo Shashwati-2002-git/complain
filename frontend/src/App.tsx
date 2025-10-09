@@ -26,15 +26,63 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function DashboardRoute() {
   const { user } = useAuth();
   useNotificationPermission();
+  
+  // Log user data for debugging
+  console.log("DashboardRoute - Current user:", user);
+  console.log("DashboardRoute - User role:", user?.role);
+  
+  // If user data isn't available, check localStorage as fallback
+  const [fallbackUser, setFallbackUser] = React.useState(null);
+  const [hasAttemptedRecovery, setHasAttemptedRecovery] = React.useState(false);
+  
+  React.useEffect(() => {
+    // Only attempt recovery once per component lifecycle
+    if (hasAttemptedRecovery) return;
+    
+    if (!user) {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          console.log("No user in context, using fallback from localStorage:", parsedUser);
+          setFallbackUser(parsedUser);
+          
+          // Track that we've attempted recovery
+          setHasAttemptedRecovery(true);
+          
+          // Force reload once to properly initialize auth context if needed
+          // But only if we haven't tried before in this session
+          if (!sessionStorage.getItem('dashboard_loaded')) {
+            console.log("First dashboard load, forcing refresh to initialize auth context");
+            sessionStorage.setItem('dashboard_loaded', 'true');
+            // Use a small timeout to prevent immediate reload loops
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          }
+        } catch (error) {
+          console.error("Error parsing user from localStorage:", error);
+        }
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+  
+  const activeUser = user || fallbackUser;
 
   return (
     <div className="min-h-screen bg-gray-900">
       <Notifications />
-      {user?.role === 'admin' && <AdminDashboard />}
-      {user?.role === 'agent' && <AgentDashboard />}
-      {user?.role === 'user' && <UserDashboard />}
-      {user?.role === 'analytics' && <AnalyticsReportsDashboard />}
-      {!user?.role && <div className="p-8 text-white">Loading user data...</div>}
+      {activeUser?.role === 'admin' && <AdminDashboard />}
+      {activeUser?.role === 'agent' && <AgentDashboard />}
+      {activeUser?.role === 'user' && <UserDashboard />}
+      {activeUser?.role === 'analytics' && <AnalyticsReportsDashboard />}
+      {!activeUser?.role && (
+        <div className="p-8 text-white flex flex-col items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+          <div className="text-xl">Loading dashboard...</div>
+        </div>
+      )}
       <ChatBot />
     </div>
   );

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Mail, Lock, User, AlertCircle, UserCheck, ArrowRight, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, UserCheck, ArrowRight, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import validateGoogleConfig from '../../services/googleAuthDebug';
 import { OTPVerification } from './OTPVerification';
+import { redirectToDashboard } from '../../utils/authRedirectUtils';
 
 export function LoginForm() {
   const [isLogin, setIsLogin] = useState(true);
@@ -58,9 +59,14 @@ export function LoginForm() {
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     try {
       if (credentialResponse.credential) {
+        console.log('Google credential received, attempting login...');
         const success = await googleLogin(credentialResponse.credential);
         if (!success) {
           setError('Google authentication failed');
+        } else {
+          console.log('Google authentication successful, redirecting to dashboard...');
+          // Use the redirect utility to navigate based on user role
+          redirectToDashboard();
         }
       }
     } catch (err) {
@@ -84,13 +90,28 @@ export function LoginForm() {
     window.location.href = facebookAuthUrl;
   };
 
-  console.log('Google Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
+  // Debug Google Client ID
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  console.log('Google Client ID:', googleClientId);
+  if (!googleClientId) {
+    console.error('ERROR: Google Client ID is missing in environment variables!');
+  }
   
   // Handle OTP verification success
   const handleVerificationSuccess = () => {
     // This will be called after successful OTP verification
     // The auth context will already have updated the user state
     console.log("OTP verification successful");
+    
+    // Get user data from localStorage to determine role
+    const userData = localStorage.getItem("user");
+    const user = userData ? JSON.parse(userData) : null;
+    const role = user?.role || 'user';
+    
+    console.log(`OTP verification successful, user role: ${role}`);
+    
+    // Redirect to the dashboard based on user role
+    redirectToDashboard();
   };
 
   // Show OTP verification screen if there's a pending verification

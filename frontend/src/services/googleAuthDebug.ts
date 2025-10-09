@@ -20,10 +20,26 @@ export const validateGoogleConfig = () => {
     return false;
   }
   
-  if (currentOrigin !== 'http://localhost:5173' && 
-      currentOrigin !== 'http://localhost:5001' && 
-      currentOrigin !== 'http://localhost:3000') {
-    console.warn('WARNING: You might need to add this origin to your Google Cloud Console authorized origins:', currentOrigin);
+  // Known authorized origins - update this list as needed
+  const knownOrigins = [
+    'http://localhost:5173',
+    'http://localhost:5001', 
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5001',
+    'http://127.0.0.1:3000'
+  ];
+  
+  if (!knownOrigins.includes(currentOrigin)) {
+    console.error(`ERROR: Current origin "${currentOrigin}" is not authorized for Google Sign-In.`);
+    console.error('Please add this origin to your Google Cloud Console authorized origins:');
+    console.error('1. Go to https://console.cloud.google.com/apis/credentials');
+    console.error('2. Find your OAuth 2.0 Client ID');
+    console.error('3. Add this origin to the "Authorized JavaScript origins" list');
+    console.error(`4. Add: ${currentOrigin}`);
+    return false;
+  } else {
+    console.log('✅ Origin appears to be correctly configured');
   }
   
   return true;

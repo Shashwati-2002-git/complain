@@ -25,7 +25,7 @@
     "clean": "rimraf backend/dist frontend/dist backend/node_modules frontend/node_modules node_modules"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0",
+    "concurrently": "^8.2.2",
     "rimraf": "^5.0.1"
   },
   "engines": {
