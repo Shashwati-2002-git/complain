@@ -150,6 +150,7 @@ export const AdminDashboard = () => {
       name: 'John Doe',
       initials: 'JD',
       status: 'available',
+      availability: 'available',
       currentLoad: 3,
       avgResponseTime: '4m 30s',
       color: 'blue',
@@ -160,6 +161,7 @@ export const AdminDashboard = () => {
       name: 'Alice Smith',
       initials: 'AS',
       status: 'busy',
+      availability: 'busy',
       currentLoad: 6,
       avgResponseTime: '5m 12s',
       color: 'purple',
@@ -170,6 +172,7 @@ export const AdminDashboard = () => {
       name: 'Robert Johnson',
       initials: 'RJ',
       status: 'available',
+      availability: 'available',
       currentLoad: 2,
       avgResponseTime: '3m 45s',
       color: 'green',
@@ -180,6 +183,7 @@ export const AdminDashboard = () => {
       name: 'Emily Davis',
       initials: 'ED',
       status: 'offline',
+      availability: 'offline',
       currentLoad: 0,
       avgResponseTime: '4m 15s',
       color: 'gray',
@@ -190,6 +194,7 @@ export const AdminDashboard = () => {
       name: 'Michael Wilson',
       initials: 'MW',
       status: 'busy',
+      availability: 'busy',
       currentLoad: 8,
       avgResponseTime: '6m 20s',
       color: 'orange',
@@ -385,8 +390,9 @@ export const AdminDashboard = () => {
         const formattedAgents = updatedAgents.map(agent => ({
           id: agent._id,
           name: agent.name,
-          initials: agent.name.split(' ').map((n: string) => n[0]).join(''),
+          initials: agent.name ? agent.name.split(' ').map((n: string) => n[0]).join('') : '',
           status: agent.isOnline ? 'available' : 'offline',
+          availability: agent.availability || (agent.isOnline ? 'available' : 'offline'),
           currentLoad: agent.activeComplaints?.length || 0,
           avgResponseTime: agent.avgResponseTime || '5m',
           color: getAgentColor(agent.activeComplaints?.length || 0),
@@ -856,14 +862,14 @@ export const AdminDashboard = () => {
                             ${agent.status === 'available' ? 'bg-green-100 text-green-800' : 
                             agent.status === 'busy' ? 'bg-yellow-100 text-yellow-800' : 
                             'bg-gray-100 text-gray-800'}`}>
-                            {agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}
+                            {agent.status ? agent.status.charAt(0).toUpperCase() + agent.status.slice(1) : 'Unknown'}
                           </span>
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                             ${agent.availability === 'available' ? 'bg-green-100 text-green-800' : 
                             agent.availability === 'busy' ? 'bg-yellow-100 text-yellow-800' : 
                             agent.availability === 'offline' ? 'bg-gray-400 text-white' :
                             'bg-gray-100 text-gray-800'}`}>
-                            Availability: {agent.availability.charAt(0).toUpperCase() + agent.availability.slice(1)}
+                            Availability: {agent.availability ? agent.availability.charAt(0).toUpperCase() + agent.availability.slice(1) : 'Unknown'}
                           </span>
                         </div>
                       </td>
